@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+import os
 
 st.set_page_config(page_title="Asistente E/LE Pro", layout="wide")
 
@@ -31,31 +32,33 @@ if st.button("🚀 Generar Material"):
         st.error("Introduce la API Key")
     else:
         try:
-            # Configuración básica sin argumentos extra
-            genai.configure(api_key=api_key.strip())
+            # CONFIGURACIÓN DE SEGURIDAD
+            os.environ["GOOGLE_API_KEY"] = api_key.strip()
+            genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
             
-            # Usamos el nombre del modelo sin el prefijo 'models/'
+            # Forzamos la búsqueda de modelos disponibles para evitar el 404
             model = genai.GenerativeModel('gemini-1.5-flash')
             
-            prompt = f"Profesor de español. Escuela: {nombre_escuela}. Nivel {nivel}. Tema: {tema}. Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}. Incluye soluciones."
+            prompt = f"Como profesor de español experto, crea material nivel {nivel} sobre {tema}. Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}. Escuela: {nombre_escuela}. Incluye soluciones y explicaciones."
             
-            with st.spinner("Generando..."):
-                # Llamada directa
+            with st.spinner("Generando contenido..."):
                 response = model.generate_content(prompt)
-                
-                # Acceso directo al texto
-                st.session_state['contenido'] = response.text
-                st.success("¡Generado!")
-                
+                if response.text:
+                    st.session_state['contenido'] = response.text
+                    st.success("¡Generado con éxito!")
+                else:
+                    st.error("La IA no devolvió texto.")
+                    
         except Exception as e:
-            # Si el anterior falla, intentamos el modelo Pro
+            # Si falla, probamos con el nombre largo oficial
             try:
-                model_alt = genai.GenerativeModel('gemini-pro')
+                model_alt = genai.GenerativeModel('models/gemini-pro')
                 response = model_alt.generate_content(prompt)
                 st.session_state['contenido'] = response.text
-                st.success("¡Generado con modelo Pro!")
+                st.success("Generado con modelo Pro")
             except Exception as e2:
-                st.error(f"Error de conexión: {e2}")
+                st.error(f"Error final de Google: {e2}")
+                st.info("Nota: Revisa si tu API Key es de 'Google AI Studio'. Las de 'Google Cloud Vertex AI' no funcionan con este código.")
 
 # --- RESULTADO ---
 if 'contenido' in st.session_state:
