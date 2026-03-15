@@ -37,53 +37,39 @@ if st.button("🚀 Generar Material"):
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
-         # --- LÓGICA DE GENERACIÓN MEJORADA ---
+         # --- LÓGICA DE GENERACIÓN (VERSIÓN CORREGIDA) ---
 if st.button("🚀 Generar Material"):
     if not api_key:
         st.error("Por favor, introduce tu API Key en la barra lateral.")
     else:
         try:
-            # 1. Limpiamos la API Key de posibles espacios accidentales
+            # 1. Configuración del motor
             genai.configure(api_key=api_key.strip())
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
-            # 2. Usamos una configuración de seguridad relajada para temas educativos
-            safety_settings = [
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            ]
-            
-            model = genai.GenerativeModel(
-                model_name='gemini-pro',
-                safety_settings=safety_settings
-            )
-            
-            prompt_final = f"""
-            Actúa como un Coordinador Académico de Español (E/LE). 
-            Nivel MCER: {nivel}. 
-            Tema: {tema}.
-            Módulo seleccionado: {modulo}. 
-            Técnicas a usar: {', '.join(tecnicas)}. 
-            Cantidad de ejercicios: {cantidad}.
-            
-            INSTRUCCIONES:
-            1. Sigue estrictamente el Marco Común Europeo.
-            2. Genera los ejercicios de forma clara.
-            3. Al final, incluye una sección de 'SOLUCIONES' y 'EXPLICACIÓN PEDAGÓGICA'.
-            4. Usa un tono académico profesional.
-            """
-            
+            # 2. Definición del Prompt (Alineación corregida)
+            # Nota: El uso de f-strings con triples comillas debe estar pegado al margen del código
+            prompt_final = f"""Actúa como un Coordinador Académico de Español (E/LE) experto.
+Nivel MCER: {nivel}.
+Tema: {tema}.
+Módulo: {modulo}.
+Técnicas: {', '.join(tecnicas)}.
+Cantidad: {cantidad}.
+
+INSTRUCCIONES:
+1. Sigue estrictamente el Marco Común Europeo.
+2. Genera los ejercicios de forma clara.
+3. Al final, incluye 'SOLUCIONES' y 'EXPLICACIÓN PEDAGÓGICA'.
+4. Usa un tono académico profesional."""
+
             with st.spinner("Generando contenido académico..."):
                 response = model.generate_content(prompt_final)
                 
-                # Verificamos si la respuesta tiene texto (por si fue bloqueada)
                 if response.text:
                     st.session_state['contenido'] = response.text
                     st.markdown(response.text)
                 else:
-                    st.warning("El modelo no pudo generar una respuesta. Intenta cambiar un poco el tema.")
+                    st.warning("El modelo no devolvió texto. Revisa tu cuota de API.")
 
         except Exception as e:
-            st.error(f"Se produjo un error técnico: {e}")
-            st.info("💡 Consejo: Revisa que tu API Key sea correcta y que tengas conexión a internet.")
+            st.error(f"Error técnico: {e}") 
