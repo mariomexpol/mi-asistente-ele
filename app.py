@@ -28,7 +28,7 @@ if st.button("🚀 Generar"):
             genai.configure(api_key=llave)
             
             # Usamos el nombre simplificado que funciona en la API v1
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-pro')
             
             prompt = f"Actúa como profesor de español experto. Crea material nivel {nivel} sobre {tema}. Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}. Incluye soluciones y explicaciones pedagógicas."
             
