@@ -20,7 +20,7 @@ if st.button("🚀 Generar Material"):
         st.error("Por favor, introduce la API Key y el tema.")
     else:
         # USAMOS EL MODELO QUE TU CUENTA SÍ TIENE: gemini-2.0-flash
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key.strip()}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key.strip()}"
         
         payload = {
             "contents": [{
