@@ -1,57 +1,52 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import json
 
-st.set_page_config(page_title="Asistente E/LE", layout="wide")
+st.set_page_config(page_title="Asistente E/LE Pro", layout="wide")
 
 st.title("🎓 Generador de Materiales E/LE")
 
 with st.sidebar:
     st.header("Configuración")
-    api_key = st.text_input("API Key", type="password")
+    api_key = st.text_input("API Key de Google AI Studio", type="password")
     nombre_escuela = st.text_input("Escuela", "Mi Escuela")
 
-tema = st.text_input("Tema de la clase")
-nivel = st.selectbox("Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
+tema = st.text_input("Tema de la clase (ej: El pretérito imperfecto)")
+nivel = st.selectbox("Nivel MCER", ["A1", "A2", "B1", "B2", "C1", "C2"])
 cantidad = st.number_input("Cantidad de ejercicios", min_value=1, value=5)
 
 if st.button("🚀 Generar Material"):
     if not api_key or not tema:
-        st.error("Falta la llave o el tema")
+        st.error("Por favor, introduce la API Key y el tema.")
     else:
-        try:
-            # --- CONFIGURACIÓN PARA EVITAR EL ERROR 404 ---
-            # Forzamos al cliente a usar la versión 'v1' en lugar de 'v1beta'
-            from google.api_core import client_options
-            options = client_options.ClientOptions(api_endpoint="generativelanguage.googleapis.com")
-            
-            genai.configure(api_key=api_key.strip(), client_options=options)
-            
-            # Usamos el nombre del modelo sin prefijos extraños
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            prompt = f"Profesor de español. Escuela: {nombre_escuela}. Nivel {nivel}. Tema: {tema}. Cantidad: {cantidad}. Incluye soluciones."
-            
-            with st.spinner("Generando contenido pedagógico..."):
-                # Realizamos la llamada
-                response = model.generate_content(prompt)
-                
-                if response.text:
-                    st.success("¡Conexión exitosa!")
-                    st.markdown(response.text)
-                    st.session_state['resultado'] = response.text
-                else:
-                    st.error("La IA no devolvió texto.")
-                    
-        except Exception as e:
-            # Si el error persiste, probamos el último recurso: gemini-pro (v1)
-            st.warning("Ajustando ruta de conexión...")
+        # CONEXIÓN DIRECTA POR HTTP (Evita el error 404 v1beta)
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
+        
+        payload = {
+            "contents": [{
+                "parts": [{
+                    "text": f"Actúa como profesor de español experto. Crea {cantidad} ejercicios nivel {nivel} sobre {tema}. Incluye soluciones. Escuela: {nombre_escuela}."
+                }]
+            }]
+        }
+        headers = {'Content-Type': 'application/json'}
+
+        with st.spinner("Generando material (Conexión Directa)..."):
             try:
-                model_alt = genai.GenerativeModel('gemini-pro')
-                response = model_alt.generate_content(prompt)
-                st.session_state['resultado'] = response.text
-                st.markdown(response.text)
-            except Exception as e2:
-                st.error(f"Error técnico: {e2}")
+                response = requests.post(url, headers=headers, data=json.dumps(payload))
+                res_json = response.json()
+                
+                # Extraemos el texto de la respuesta de Google
+                if "candidates" in res_json:
+                    texto_generado = res_json["candidates"][0]["content"]["parts"][0]["text"]
+                    st.success("¡Logrado! Material generado.")
+                    st.markdown(texto_generado)
+                    st.session_state['resultado'] = texto_generado
+                else:
+                    st.error(f"Error de la API: {res_json.get('error', {}).get('message', 'Error desconocido')}")
+                    
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
 
 if 'resultado' in st.session_state:
-    st.download_button("📥 Descargar TXT", st.session_state['resultado'], file_name="material.txt")
+    st.download_button("📥 Descargar TXT", st.session_state['resultado'], file_name="material_ele.txt")
