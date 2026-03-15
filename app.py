@@ -37,30 +37,32 @@ if st.button("🚀 Generar Material"):
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
-         # --- LÓGICA DE GENERACIÓN (VERSIÓN CORREGIDA) ---
+          # --- LÓGICA DE GENERACIÓN (VERSIÓN DEFINITIVA SIN ERRORES DE SINTAXIS) ---
 if st.button("🚀 Generar Material"):
     if not api_key:
         st.error("Por favor, introduce tu API Key en la barra lateral.")
     else:
         try:
-            # 1. Configuración del motor
+            # 1. Configuración
             genai.configure(api_key=api_key.strip())
             model = genai.GenerativeModel('gemini-1.5-flash')
             
-            # 2. Definición del Prompt (Alineación corregida)
-            # Nota: El uso de f-strings con triples comillas debe estar pegado al margen del código
-            prompt_final = f"""Actúa como un Coordinador Académico de Español (E/LE) experto.
-Nivel MCER: {nivel}.
-Tema: {tema}.
-Módulo: {modulo}.
-Técnicas: {', '.join(tecnicas)}.
-Cantidad: {cantidad}.
-
-INSTRUCCIONES:
-1. Sigue estrictamente el Marco Común Europeo.
-2. Genera los ejercicios de forma clara.
-3. Al final, incluye 'SOLUCIONES' y 'EXPLICACIÓN PEDAGÓGICA'.
-4. Usa un tono académico profesional."""
+            # 2. Construcción del Prompt (Evitando errores de comillas triples)
+            instrucciones = [
+                f"Actúa como un Coordinador Académico de Español (E/LE) experto.",
+                f"Nivel MCER: {nivel}.",
+                f"Tema: {tema}.",
+                f"Módulo: {modulo}.",
+                f"Técnicas: {', '.join(tecnicas)}.",
+                f"Cantidad de ejercicios: {cantidad}.",
+                "INSTRUCCIONES:",
+                "1. Sigue estrictamente el Marco Común Europeo.",
+                "2. Genera los ejercicios de forma clara.",
+                "3. Al final, incluye 'SOLUCIONES' y 'EXPLICACIÓN PEDAGÓGICA'.",
+                "4. Usa un tono académico profesional."
+            ]
+            
+            prompt_final = "\n".join(instrucciones)
 
             with st.spinner("Generando contenido académico..."):
                 response = model.generate_content(prompt_final)
@@ -72,4 +74,4 @@ INSTRUCCIONES:
                     st.warning("El modelo no devolvió texto. Revisa tu cuota de API.")
 
         except Exception as e:
-            st.error(f"Error técnico: {e}") 
+            st.error(f"Error técnico: {e}")
