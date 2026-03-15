@@ -1,16 +1,15 @@
 import streamlit as st
 import google.generativeai as genai
-from google.generativeai.types import RequestOptions
 
 st.set_page_config(page_title="Asistente E/LE Pro", layout="wide")
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.header("🏫 Mi Institución")
-    logo_file = st.file_uploader("Subir logo de la escuela", type=["png", "jpg", "jpeg"])
+    st.header("🏫 Configuración")
+    logo_file = st.file_uploader("Subir logo", type=["png", "jpg", "jpeg"])
     if logo_file:
         st.image(logo_file, width=150)
-    nombre_escuela = st.text_input("Nombre de la Escuela", "Mi Escuela de Español")
+    nombre_escuela = st.text_input("Escuela", "Mi Escuela de Español")
     api_key = st.text_input("API Key de Gemini", type="password")
 
 # --- INTERFAZ ---
@@ -23,47 +22,42 @@ with col1:
     modulo = st.radio("Módulo", ["Ejercicios", "Texto con Preguntas"])
 
 with col2:
-    cantidad = st.number_input("Cantidad de ítems", min_value=1, value=10)
+    cantidad = st.number_input("Cantidad", min_value=1, value=10)
     tecnicas = st.multiselect("Técnicas", 
-        ["Test de Cloze", "Rellenar huecos", "Traducción", "Corregir errores", "Ordenar frases", "Relacionar", "Completar diálogo"])
+        ["Test de Cloze", "Rellenar huecos", "Traducción", "Corregir errores", "Ordenar frases", "Relacionar"])
 
 if st.button("🚀 Generar Material"):
     if not api_key:
         st.error("Introduce la API Key")
     else:
         try:
-            # CONFIGURACIÓN MAESTRA PARA EVITAR EL 404
+            # Configuración básica sin argumentos extra
             genai.configure(api_key=api_key.strip())
             
-            # Forzamos el uso de la API v1 (estable) en lugar de v1beta
+            # Usamos el nombre del modelo sin el prefijo 'models/'
             model = genai.GenerativeModel('gemini-1.5-flash')
             
             prompt = f"Profesor de español. Escuela: {nombre_escuela}. Nivel {nivel}. Tema: {tema}. Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}. Incluye soluciones."
             
-            with st.spinner("Conectando con el servidor estable..."):
-                # Aquí está el truco: añadimos RequestOptions para forzar la versión de la API
-                response = model.generate_content(
-                    prompt,
-                    request_options=RequestOptions(api_version='v1')
-                )
+            with st.spinner("Generando..."):
+                # Llamada directa
+                response = model.generate_content(prompt)
                 
-                if response.text:
-                    st.session_state['contenido'] = response.text
-                    st.success("¡Generado correctamente!")
-                else:
-                    st.error("No se recibió texto.")
+                # Acceso directo al texto
+                st.session_state['contenido'] = response.text
+                st.success("¡Generado!")
+                
         except Exception as e:
-            # Si falla el 1.5, intentamos el 1.0 Pro que es el más compatible
-            st.warning("Ajustando compatibilidad...")
+            # Si el anterior falla, intentamos el modelo Pro
             try:
                 model_alt = genai.GenerativeModel('gemini-pro')
-                response = model_alt.generate_content(prompt, request_options=RequestOptions(api_version='v1'))
+                response = model_alt.generate_content(prompt)
                 st.session_state['contenido'] = response.text
-                st.success("¡Generado con modelo de respaldo!")
+                st.success("¡Generado con modelo Pro!")
             except Exception as e2:
-                st.error(f"Error final: {e2}")
+                st.error(f"Error de conexión: {e2}")
 
-# --- MOSTRAR ---
+# --- RESULTADO ---
 if 'contenido' in st.session_state:
     st.divider()
     st.subheader(f"📄 {nombre_escuela}")
