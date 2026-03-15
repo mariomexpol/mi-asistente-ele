@@ -1,79 +1,71 @@
 import streamlit as st
 import google.generativeai as genai
+from google.generativeai.types import RequestOptions
 
-# Configuración de la página
 st.set_page_config(page_title="Asistente E/LE Pro", layout="wide")
 
-# --- BARRA LATERAL (Logo y Configuración) ---
+# --- BARRA LATERAL ---
 with st.sidebar:
     st.header("🏫 Mi Institución")
-    # Ventana para el LOGO
     logo_file = st.file_uploader("Subir logo de la escuela", type=["png", "jpg", "jpeg"])
     if logo_file:
         st.image(logo_file, width=150)
-    
     nombre_escuela = st.text_input("Nombre de la Escuela", "Mi Escuela de Español")
     api_key = st.text_input("API Key de Gemini", type="password")
-    st.info("Obtén tu llave en: aistudio.google.com")
 
-# --- INTERFAZ DE GENERACIÓN ---
-st.title("🎓 Generador de Materiales Académicos E/LE")
+# --- INTERFAZ ---
+st.title("🎓 Generador de Materiales E/LE")
 
 col1, col2 = st.columns(2)
-
 with col1:
     nivel = st.selectbox("Nivel MCER", ["A1", "A2", "B1", "B2", "C1", "C2"])
-    tema = st.text_input("Tema gramatical o comunicativo")
+    tema = st.text_input("Tema de la clase")
     modulo = st.radio("Módulo", ["Ejercicios", "Texto con Preguntas"])
 
 with col2:
     cantidad = st.number_input("Cantidad de ítems", min_value=1, value=10)
-    # Aquí añadimos TEST DE CLOZE y las demás técnicas
     tecnicas = st.multiselect("Técnicas", 
         ["Test de Cloze", "Rellenar huecos", "Traducción", "Corregir errores", "Ordenar frases", "Relacionar", "Completar diálogo"])
 
-# --- BOTÓN DE ACCIÓN ---
 if st.button("🚀 Generar Material"):
     if not api_key:
-        st.error("Por favor, introduce tu API Key en la barra lateral.")
-    elif not tema:
-        st.warning("Escribe un tema para empezar.")
+        st.error("Introduce la API Key")
     else:
         try:
-            # Configuración para evitar el error 404
-            genai.configure(api_key=api_key.strip(), transport='rest')
+            # CONFIGURACIÓN MAESTRA PARA EVITAR EL 404
+            genai.configure(api_key=api_key.strip())
+            
+            # Forzamos el uso de la API v1 (estable) en lugar de v1beta
             model = genai.GenerativeModel('gemini-1.5-flash')
             
-            # Construcción del mensaje para la IA
-            prompt = (
-                f"Actúa como profesor de español. Crea material nivel {nivel} sobre {tema}. "
-                f"Módulo: {modulo}. Técnicas: {', '.join(tecnicas)}. Cantidad: {cantidad}. "
-                f"Institución: {nombre_escuela}. "
-                "REQUISITO: Incluye soluciones y explicaciones pedagógicas detalladas al final."
-            )
+            prompt = f"Profesor de español. Escuela: {nombre_escuela}. Nivel {nivel}. Tema: {tema}. Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}. Incluye soluciones."
             
-            with st.spinner("Generando contenido académico..."):
-                response = model.generate_content(prompt)
+            with st.spinner("Conectando con el servidor estable..."):
+                # Aquí está el truco: añadimos RequestOptions para forzar la versión de la API
+                response = model.generate_content(
+                    prompt,
+                    request_options=RequestOptions(api_version='v1')
+                )
+                
                 if response.text:
-                    st.session_state['contenido_final'] = response.text
-                    st.success("¡Material generado!")
+                    st.session_state['contenido'] = response.text
+                    st.success("¡Generado correctamente!")
                 else:
-                    st.error("La IA no devolvió texto. Revisa tu configuración.")
+                    st.error("No se recibió texto.")
         except Exception as e:
-            st.error(f"Error técnico: {e}")
-            st.info("Si el error es 404, prueba a generar una nueva API Key en Google AI Studio.")
+            # Si falla el 1.5, intentamos el 1.0 Pro que es el más compatible
+            st.warning("Ajustando compatibilidad...")
+            try:
+                model_alt = genai.GenerativeModel('gemini-pro')
+                response = model_alt.generate_content(prompt, request_options=RequestOptions(api_version='v1'))
+                st.session_state['contenido'] = response.text
+                st.success("¡Generado con modelo de respaldo!")
+            except Exception as e2:
+                st.error(f"Error final: {e2}")
 
-# --- MOSTRAR RESULTADO Y DESCARGA ---
-if 'contenido_final' in st.session_state:
+# --- MOSTRAR ---
+if 'contenido' in st.session_state:
     st.divider()
-    # Mostramos el encabezado con el nombre de tu escuela
-    st.subheader(f"📄 Material para: {nombre_escuela}")
-    st.markdown(st.session_state['contenido_final'])
-    
-    # Botón de descarga
-    st.download_button(
-        label="📥 Descargar en TXT",
-        data=st.session_state['contenido_final'],
-        file_name=f"Material_ELE_{tema}.txt",
-        mime="text/plain"
-    )
+    st.subheader(f"📄 {nombre_escuela}")
+    st.markdown(st.session_state['contenido'])
+    st.download_button("📥 Descargar TXT", st.session_state['contenido'], file_name="material.txt")
