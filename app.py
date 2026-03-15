@@ -1,131 +1,80 @@
 import streamlit as st
 import requests
 import json
-from fpdf import FPDF
-import tempfile
 
 st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
-
-# --- CLASE PDF PROFESIONAL ---
-class ELE_PDF(FPDF):
-    def header(self):
-        if hasattr(self, 'logo_path') and self.logo_path:
-            self.image(self.logo_path, 10, 8, 30)
-        self.set_font('helvetica', 'B', 15)
-        self.set_x(45)
-        # Codificación segura para el encabezado
-        escuela_safe = self.nombre_escuela.encode('latin-1', 'replace').decode('latin-1')
-        self.cell(0, 10, escuela_safe, ln=True, align='L')
-        self.ln(10)
-
-    def write_markdown(self, txt):
-        """Detecta ** para negritas y limpia caracteres latinos"""
-        parts = txt.split('**')
-        for i, part in enumerate(parts):
-            if i % 2 == 1:
-                self.set_font('helvetica', 'B', 12)
-            else:
-                self.set_font('helvetica', '', 12)
-            
-            # Limpieza profunda para evitar el error de 'string argument'
-            clean_part = part.encode('latin-1', 'replace').decode('latin-1')
-            self.write(7, clean_part)
-
-def generar_pdf_profesional(texto, escuela, logo_path):
-    pdf = ELE_PDF()
-    pdf.nombre_escuela = escuela
-    pdf.logo_path = logo_path
-    pdf.add_page()
-    
-    lineas = texto.split('\n')
-    for linea in lineas:
-        if linea.strip() == "":
-            pdf.ln(5)
-        else:
-            pdf.write_markdown(linea)
-            pdf.ln(7)
-    
-    # SALIDA: Devolvemos el bytearray directamente
-    return pdf.output()
 
 # --- BARRA LATERAL ---
 with st.sidebar:
     st.header("🏫 Configuración")
-    logo_file = st.file_uploader("Subir logo", type=["png", "jpg", "jpeg"])
-    logo_path = None
-    if logo_file:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-            tmp.write(logo_file.getvalue())
-            logo_path = tmp.name
-        st.image(logo_file, width=150)
-    
     nombre_escuela = st.text_input("Escuela", "El Sabor de la Lengua")
     nombre_profe = st.text_input("Profesor/a", "Mario")
     api_key = st.text_input("API Key", type="password")
+    st.info("Nota: El archivo TXT está diseñado para ser convertido a PDF en tu iPad.")
 
 # --- INTERFAZ ---
 st.title("🎓 Generador ELE Pro")
-modo = st.radio("Modo:", ["Unidad con Texto Base", "Solo Lista de Ejercicios"], horizontal=True)
+modo = st.radio("Modo de trabajo:", ["Unidad Completa (Texto + Ejercicios)", "Solo Ejercicios"], horizontal=True)
+
+st.divider()
 
 col1, col2 = st.columns(2)
 with col1:
-    tema = st.text_input("Tema de la clase")
+    tema = st.text_input("Tema de la clase", placeholder="Ej: Tradiciones mexicanas")
     nivel = st.selectbox("Nivel MCER", ["A1", "A2", "B1", "B2", "C1", "C2"])
-    if modo == "Unidad con Texto Base":
+    if modo == "Unidad Completa (Texto + Ejercicios)":
         extension = st.select_slider("Extensión del texto", 
-                                    options=["Corto", "1 página", "2 páginas", "3 páginas (Extenso)"], 
+                                    options=["Corto", "Medio", "Largo (2 págs)", "Extenso (3 págs)"], 
                                     value="3 páginas (Extenso)")
-    cantidad = st.number_input("Ítems por técnica", 1, 30, 15)
+    cantidad = st.number_input("Cantidad de ejercicios por técnica", 1, 30, 15)
 
 with col2:
-    tecnicas = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas", "Ordenar frases"], default=["Test de Cloze", "Preguntas de comprensión"])
-    # Recuperada la opción Vocabulario
-    gramatica = st.multiselect("Gramática / Vocabulario", ["Presente", "Pretéritos", "Subjuntivo", "Ser/Estar", "Vocabulario"], default=["Subjuntivo", "Vocabulario"])
+    tecnicas = st.multiselect("Técnicas pedagógicas", 
+                             ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", 
+                              "Corregir errores", "Relacionar columnas", "Ordenar frases"],
+                             default=["Test de Cloze", "Preguntas de comprensión"])
+    
+    gramatica = st.multiselect("Enfoque Gramática / Vocabulario", 
+                            ["Presente", "Pretéritos", "Subjuntivo", "Ser/Estar", "Vocabulario"],
+                            default=["Subjuntivo", "Vocabulario"])
 
-if st.button("🚀 Generar Material"):
+if st.button("🚀 Generar Material Profesional"):
     if not api_key or not tema:
-        st.error("⚠️ Datos incompletos.")
+        st.error("⚠️ Por favor, introduce la API Key y el tema.")
     else:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={api_key.strip()}"
         
-        # Prompt forzado para 3 páginas
+        # PROMPT REFORZADO PARA TXT ESTRUCTURADO
         prompt = f"""
-        Actúa como profesor de {nombre_escuela}. Genera una unidad nivel {nivel} sobre '{tema}'.
-        REQUISITOS:
-        1. TEXTO: Mínimo 2000 palabras, profundidad académica, secciones claras con subtítulos en **Negrita**.
-        2. EJERCICIOS: EXACTAMENTE {cantidad} ítems por técnica: {', '.join(tecnicas)}.
-        3. ENFOQUE: {', '.join(gramatica)}.
-        Firma: {nombre_profe}. Incluye soluciones.
+        Actúa como profesor de {nombre_escuela}. Genera una unidad ELE de nivel {nivel} sobre '{tema}'.
+        
+        ESTRUCTURA DEL TXT (MUY IMPORTANTE):
+        1. Encabezado: Nombre de la escuela y Profesor {nombre_profe}.
+        2. Texto Base: Mínimo 2000 palabras si es 'Extenso', dividido en secciones con títulos claros en MAYÚSCULAS.
+        3. Ejercicios: EXACTAMENTE {cantidad} ítems por técnica: {', '.join(tecnicas)}.
+        4. Gramática/Vocabulario: {', '.join(gramatica)}.
+        5. Soluciones: Al final del documento.
+        
+        Usa separadores como '====================================' entre secciones para que se vea profesional al imprimir.
         """
         
-        with st.spinner("Generando material extenso..."):
+        with st.spinner("Generando material extenso... (Puede tardar 1 minuto)"):
             try:
                 r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
-                st.session_state['material_final'] = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                res_json = r.json()
+                st.session_state['material_final'] = res_json["candidates"][0]["content"]["parts"][0]["text"]
                 st.success("¡Material generado!")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error en la generación: {e}")
 
-# --- SECCIÓN DE DESCARGAS ---
 if 'material_final' in st.session_state:
     st.divider()
     st.markdown(st.session_state['material_final'])
     
-    col_txt, col_pdf = st.columns(2)
-    with col_txt:
-        st.download_button("📥 Descargar TXT", data=st.session_state['material_final'], file_name=f"Material_{tema}.txt")
-    
-    with col_pdf:
-        try:
-            # Generamos el PDF (esto devuelve un bytearray en fpdf2)
-            pdf_bytes = generar_pdf_profesional(st.session_state['material_final'], nombre_escuela, logo_path)
-            
-            # Descarga directa
-            st.download_button(
-                label="📄 Descargar PDF Profesional",
-                data=pdf_bytes,
-                file_name=f"Material_{tema}.pdf",
-                mime="application/pdf"
-            )
-        except Exception as e:
-            st.error(f"Error técnico al preparar el PDF: {e}")
+    # Botón de descarga TXT (Fiable al 100%)
+    st.download_button(
+        label="📥 Descargar Material Profesional (TXT)",
+        data=st.session_state['material_final'],
+        file_name=f"Unidad_ELE_{tema.replace(' ', '_')}.txt",
+        mime="text/plain"
+    )
