@@ -1,41 +1,34 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.set_page_config(page_title="Asistente ELE")
+st.title("Generador E/LE Rápido")
 
-st.title("🎓 Asistente para Profesores de Español")
+# Campos obligatorios arriba para evitar errores
+llave = st.text_input("API Key", type="password")
+tema_clase = st.text_input("Tema")
+nivel_mcer = st.selectbox("Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
 
-# Sidebar para configuración
-with st.sidebar:
-    st.header("Configuración")
-    api_key = st.text_input("API Key de Gemini", type="password")
-    escuela = st.text_input("Nombre de la Escuela", "Mi Escuela")
-
-# Cuerpo principal
-tema = st.text_input("Tema de la clase")
-nivel = st.selectbox("Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
-cantidad = st.number_input("Cantidad de ejercicios", min_value=1, value=10)
-
-if st.button("🚀 Generar Material"):
-    if not api_key:
-        st.error("Por favor, introduce tu API Key.")
-    elif not tema:
-        st.error("Introduce un tema.")
+if st.button("🚀 Generar Ahora"):
+    if not llave or not tema_clase:
+        st.error("Rellena la llave y el tema")
     else:
         try:
-            genai.configure(api_key=api_key.strip())
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            # Conexión sin variables intermedias
+            genai.configure(api_key=llave.strip())
+            modelo = genai.GenerativeModel('gemini-1.5-flash')
             
-            prompt = f"Crea material de español nivel {nivel} sobre {tema}. Cantidad: {cantidad}. Incluye soluciones. Escuela: {escuela}"
+            # Pedimos algo muy corto para probar
+            prompt = f"Crea 3 ejercicios cortos de español nivel {nivel_mcer} sobre {tema_clase} con soluciones."
             
-            with st.spinner("Generando..."):
-                response = model.generate_content(prompt)
-                st.session_state['material'] = response.text
-                st.success("¡Generado!")
+            # Llamada directa sin spinner para ver si hay error inmediato
+            respuesta = modelo.generate_content(prompt)
+            
+            if respuesta.text:
+                st.success("¡Logrado!")
+                st.markdown(respuesta.text)
+                st.download_button("Descargar", respuesta.text, file_name="ejercicios.txt")
+            else:
+                st.warning("La IA respondió vacío.")
+                
         except Exception as e:
-            st.error(f"Error: {e}")
-
-if 'material' in st.session_state:
-    st.divider()
-    st.markdown(st.session_state['material'])
-    st.download_button("📥 Descargar TXT", st.session_state['material'], file_name="clase.txt")
+            st.error(f"Error detectado: {e}")
