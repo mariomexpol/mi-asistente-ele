@@ -1,47 +1,51 @@
 import streamlit as st
 import google.generativeai as genai
+from google.generativeai.types import RequestOptions
 
-st.title("Generador E/LE (Versión Estable)")
+st.set_page_config(page_title="Asistente E/LE", layout="wide")
 
+st.title("🎓 Generador de Materiales E/LE")
+
+# Barra lateral
 with st.sidebar:
+    st.header("Configuración")
     api_key = st.text_input("API Key", type="password")
-    st.info("Asegúrate de que sea de aistudio.google.com")
+    nombre_escuela = st.text_input("Escuela", "Mi Escuela")
 
+# Campos
 tema = st.text_input("Tema de la clase")
 nivel = st.selectbox("Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
+cantidad = st.number_input("Cantidad", min_value=1, value=5)
 
 if st.button("🚀 Generar Material"):
     if not api_key or not tema:
-        st.error("Faltan datos")
+        st.error("Falta la llave o el tema")
     else:
         try:
+            # CONFIGURACIÓN CLAVE: Forzamos la versión v1
             genai.configure(api_key=api_key.strip())
             
-            # TRUCO FINAL: Usamos la ruta completa del modelo para evitar el error 404
-            # Probamos primero con esta ruta específica
-            model = genai.GenerativeModel(model_name='models/gemini-1.5-flash-latest')
+            # Usamos el modelo flash con la opción de versión estable
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
-            prompt = f"Crea material de español nivel {nivel} sobre {tema} con soluciones."
+            prompt = f"Como profesor de español, crea {cantidad} ejercicios nivel {nivel} sobre {tema}. Incluye soluciones. Escuela: {nombre_escuela}."
             
-            with st.spinner("Conectando con el servidor de Google..."):
-                response = model.generate_content(prompt)
+            with st.spinner("Generando contenido estable..."):
+                # TRUCO: Aquí forzamos la API v1 que no da error 404
+                response = model.generate_content(
+                    prompt, 
+                    request_options={"api_version": "v1"}
+                )
                 
                 if response.text:
-                    st.success("¡Por fin! Generado con éxito.")
+                    st.success("¡Logrado!")
                     st.markdown(response.text)
-                    st.session_state['cache'] = response.text
+                    st.session_state['resultado'] = response.text
                 else:
-                    st.warning("Respuesta vacía.")
+                    st.error("La IA no devolvió texto.")
                     
         except Exception as e:
-            # Si el anterior falla, el código intenta la versión Pro automáticamente
-            st.warning("Reintentando con modelo de respaldo...")
-            try:
-                model_alt = genai.GenerativeModel(model_name='models/gemini-1.0-pro')
-                response = model_alt.generate_content(prompt)
-                st.markdown(response.text)
-            except Exception as e2:
-                st.error(f"Error persistente: {e2}")
+            st.error(f"Error de conexión: {e}")
 
-if 'cache' in st.session_state:
-    st.download_button("Descargar TXT", st.session_state['cache'], file_name="material.txt")
+if 'resultado' in st.session_state:
+    st.download_button("Descargar TXT", st.session_state['resultado'], file_name="material.txt")
