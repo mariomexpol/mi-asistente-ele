@@ -24,7 +24,7 @@ if st.button("🚀 Generar"):
     else:
         try:
             genai.configure(api_key=api_key.strip())
-            model = genai.GenerativeModel('gemini-pro')
+            model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
             prompt = f"Actúa como profesor de español. Crea material nivel {nivel} sobre {tema}. Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}. Incluye soluciones y explicaciones pedagógicas."
             
             with st.spinner("Generando..."):
