@@ -3,6 +3,7 @@ import requests
 import json
 from fpdf import FPDF
 import tempfile
+import io
 
 st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
 
@@ -13,22 +14,22 @@ class ELE_PDF(FPDF):
             self.image(self.logo_path, 10, 8, 30)
         self.set_font('helvetica', 'B', 15)
         self.set_x(45)
-        # Codificación segura para el nombre de la escuela
+        # Codificación para el nombre de la escuela
         escuela_safe = self.nombre_escuela.encode('latin-1', 'replace').decode('latin-1')
         self.cell(0, 10, escuela_safe, ln=True, align='L')
         self.ln(10)
 
     def write_markdown(self, txt):
-        """Procesa negritas ** y limpia caracteres especiales"""
+        """Procesa negritas ** y maneja caracteres latinos"""
         parts = txt.split('**')
         for i, part in enumerate(parts):
             if i % 2 == 1:
                 self.set_font('helvetica', 'B', 12)
             else:
                 self.set_font('helvetica', '', 12)
-            # Limpieza profunda de caracteres para evitar archivos de 0 KB
-            clean_part = part.replace('¿', '?').replace('¡', '!').replace('ñ', 'n').replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
-            clean_part = clean_part.encode('latin-1', 'replace').decode('latin-1')
+            
+            # Limpieza y codificación para evitar el error de "string argument"
+            clean_part = part.encode('latin-1', 'replace').decode('latin-1')
             self.write(7, clean_part)
 
 def generar_pdf_profesional(texto, escuela, logo_path):
@@ -45,8 +46,8 @@ def generar_pdf_profesional(texto, escuela, logo_path):
             pdf.write_markdown(linea)
             pdf.ln(7)
     
-    # MÉTODO SEGURO: Genera el PDF como un string de bytes y luego lo convertimos
-    return pdf.output(dest='S')
+    # SALIDA BINARIA: Usamos 'bytearray' para que Streamlit no se confunda
+    return pdf.output()
 
 # --- BARRA LATERAL ---
 with st.sidebar:
@@ -94,6 +95,7 @@ if st.button("🚀 Generar Material"):
             except Exception as e:
                 st.error(f"Error: {e}")
 
+# --- SECCIÓN DE DESCARGAS ---
 if 'material_final' in st.session_state:
     st.divider()
     st.markdown(st.session_state['material_final'])
@@ -104,13 +106,13 @@ if 'material_final' in st.session_state:
     
     with col_pdf:
         try:
-            # Generamos el PDF usando el método de string de salida
-            pdf_bytes = generar_pdf_profesional(st.session_state['material_final'], nombre_escuela, logo_path)
+            # Generamos el PDF directamente a memoria de bytes
+            pdf_data = generar_pdf_profesional(st.session_state['material_final'], nombre_escuela, logo_path)
             
-            # Forzamos la descarga asegurándonos de enviar bytes
+            # El objeto devuelto por pdf.output() en fpdf2 ya es binario
             st.download_button(
                 label="📄 Descargar PDF Profesional",
-                data=bytes(pdf_bytes),
+                data=pdf_data,
                 file_name=f"Material_{tema}.pdf",
                 mime="application/pdf"
             )
