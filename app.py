@@ -2,91 +2,68 @@ import streamlit as st
 import requests
 import json
 
-# Configuración de página
 st.set_page_config(page_title="Asistente E/LE Pro", layout="wide")
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.header("🏫 Configuración del Centro")
+    st.header("🏫 Configuración")
+    logo_file = st.file_uploader("Subir logo", type=["png", "jpg", "jpeg"])
+    if logo_file: st.image(logo_file, width=150)
     
-    # Ventana para el LOGO
-    logo_file = st.file_uploader("Subir logo de la escuela", type=["png", "jpg", "jpeg"])
-    if logo_file:
-        st.image(logo_file, width=150)
-    
-    nombre_escuela = st.text_input("Nombre de la Escuela", "Mi Escuela de Español")
-    nombre_profe = st.text_input("Nombre del Profesor/a", "Tu Nombre")
-    api_key = st.text_input("API Key (Gemini 2.5 Pro)", type="password")
-    st.info("Obtén tu clave en: aistudio.google.com")
+    nombre_escuela = st.text_input("Escuela", "El Sabor de la Lengua")
+    nombre_profe = st.text_input("Profesor/a", "Mario")
+    api_key = st.text_input("API Key", type="password")
 
 # --- INTERFAZ PRINCIPAL ---
-st.title("🎓 Generador de Materiales E/LE")
-st.markdown("Crea materiales académicos personalizados y listos para usar.")
+st.title("🎓 Generador de Unidades Didácticas E/LE")
 
 col1, col2 = st.columns(2)
 
 with col1:
+    tema_especifico = st.text_input("Tema del texto", placeholder="Ej: La contaminación en las ciudades o Navidad en México")
     nivel = st.selectbox("Nivel MCER", ["A1", "A2", "B1", "B2", "C1", "C2"])
-    tema = st.text_input("Tema de la clase", placeholder="Ej: El pretérito indefinido")
-    modulo = st.radio("Tipo de material", ["Ejercicios Gramaticales", "Comprensión Lectora"])
+    extension = st.select_slider("Extensión del texto base", 
+                                options=["Corto (150 palabras)", "Medio (Mitad A4)", "Largo (A4 completo)"])
 
 with col2:
-    cantidad = st.number_input("Cantidad de ejercicios/preguntas", min_value=1, max_value=20, value=5)
-    tecnicas = st.multiselect("Técnicas pedagógicas", 
-                             ["Test de Cloze", "Rellenar huecos", "Traducción", "Corregir errores", "Relacionar", "Ordenar frases"])
+    enfoque = st.multiselect("Gramática a evaluar", 
+                            ["Presente", "Pretéritos", "Subjuntivo", "Por/Para", "Ser/Estar"])
+    cantidad_ejercicios = st.slider("Número de ejercicios", 1, 10, 5)
 
-# --- LÓGICA DE GENERACIÓN ---
-if st.button("🚀 Generar Material"):
-    if not api_key or not tema:
-        st.error("⚠️ Por favor, introduce la API Key y el tema en la barra lateral.")
+if st.button("🚀 Crear Unidad Completa"):
+    if not api_key or not tema_especifico:
+        st.error("⚠️ Falta la API Key o el Tema del texto.")
     else:
-        # URL forzada al modelo que te funcionó: Gemini 2.5 Pro
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={api_key.strip()}"
         
-        cuerpo_prompt = (
-            f"Actúa como un profesor de español experto de la institución {nombre_escuela}. "
-            f"Crea material de nivel {nivel} sobre el tema: {tema}. "
-            f"Módulo: {modulo}. Técnicas a usar: {', '.join(tecnicas)}. "
-            f"Cantidad: {cantidad} ejercicios. "
-            f"Firma el documento como el profesor/a {nombre_profe}. "
-            f"IMPORTANTE: Incluye siempre una sección final con las SOLUCIONES detalladas."
-        )
+        # Prompt estructurado para generar primero el texto y luego los ejercicios
+        prompt = f"""
+        Actúa como un profesor de español de {nombre_escuela}.
+        PASO 1: Redacta un texto original para nivel {nivel} sobre el tema '{tema_especifico}'. 
+        Extensión aproximada: {extension}. 
         
-        payload = {
-            "contents": [{"parts": [{"text": cuerpo_prompt}]}]
-        }
-        headers = {'Content-Type': 'application/json'}
-
-        with st.spinner("Conectando con Gemini 2.5 Pro..."):
+        PASO 2: Basándote EXCLUSIVAMENTE en el texto redactado, crea {cantidad_ejercicios} actividades:
+        - Incluye técnicas como Test de Cloze, preguntas de comprensión y corrección de errores.
+        - Enfócate en la gramática: {', '.join(enfoque)}.
+        
+        PASO 3: Añade las soluciones detalladas al final.
+        
+        Formatea todo con títulos claros. Firma como el profesor {nombre_profe}.
+        """
+        
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        
+        with st.spinner("Redactando texto y diseñando ejercicios..."):
             try:
-                response = requests.post(url, headers=headers, data=json.dumps(payload))
+                response = requests.post(url, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
                 res_json = response.json()
-                
-                if "candidates" in res_json:
-                    texto_final = res_json["candidates"][0]["content"]["parts"][0]["text"]
-                    st.session_state['material_generado'] = texto_final
-                    st.success("¡Material generado con éxito!")
-                else:
-                    st.error(f"Error de la API: {res_json.get('error', {}).get('message', 'Error desconocido')}")
+                texto_final = res_json["candidates"][0]["content"]["parts"][0]["text"]
+                st.session_state['unidad_didactica'] = texto_final
+                st.success("¡Unidad Generada!")
             except Exception as e:
-                st.error(f"Error de conexión: {e}")
+                st.error(f"Error: {e}")
 
-# --- MOSTRAR RESULTADOS ---
-if 'material_generado' in st.session_state:
+if 'unidad_didactica' in st.session_state:
     st.divider()
-    
-    # Encabezado visual en la app
-    if logo_file:
-        st.image(logo_file, width=100)
-    st.subheader(f"📄 Material: {tema} - {nombre_escuela}")
-    st.info(f"Profesor/a: {nombre_profe}")
-    
-    st.markdown(st.session_state['material_generado'])
-    
-    # Descarga
-    st.download_button(
-        label="📥 Descargar Material (TXT)",
-        data=st.session_state['material_generado'],
-        file_name=f"Clase_{tema.replace(' ', '_')}.txt",
-        mime="text/plain"
-    )
+    st.markdown(st.session_state['unidad_didactica'])
+    st.download_button("📥 Descargar Unidad (TXT)", st.session_state['unidad_didactica'], file_name=f"Unidad_{tema_especifico}.txt") 
