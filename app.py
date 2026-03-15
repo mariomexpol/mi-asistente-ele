@@ -37,42 +37,53 @@ if st.button("🚀 Generar Material"):
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
-        Actúa como un Coordinador Académico E/LE experto. 
-        Crea material de nivel {nivel} sobre {tema}.
-        Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}.
-        Sigue estrictamente el MCER. Incluye SOLUCIONES y EXPLICACIÓN PEDAGÓGICA al final.
-        """
-        
-        with st.spinner("Generando contenido académico..."):
-            response = model.generate_content(prompt)
-            contenido = response.text
-            st.session_state['contenido'] = contenido
-            st.markdown(contenido)
+         # --- LÓGICA DE GENERACIÓN MEJORADA ---
+if st.button("🚀 Generar Material"):
+    if not api_key:
+        st.error("Por favor, introduce tu API Key en la barra lateral.")
+    else:
+        try:
+            # 1. Limpiamos la API Key de posibles espacios accidentales
+            genai.configure(api_key=api_key.strip())
+            
+            # 2. Usamos una configuración de seguridad relajada para temas educativos
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+            
+            model = genai.GenerativeModel(
+                model_name='gemini-1.5-flash',
+                safety_settings=safety_settings
+            )
+            
+            prompt_final = f"""
+            Actúa como un Coordinador Académico de Español (E/LE). 
+            Nivel MCER: {nivel}. 
+            Tema: {tema}.
+            Módulo seleccionado: {modulo}. 
+            Técnicas a usar: {', '.join(tecnicas)}. 
+            Cantidad de ejercicios: {cantidad}.
+            
+            INSTRUCCIONES:
+            1. Sigue estrictamente el Marco Común Europeo.
+            2. Genera los ejercicios de forma clara.
+            3. Al final, incluye una sección de 'SOLUCIONES' y 'EXPLICACIÓN PEDAGÓGICA'.
+            4. Usa un tono académico profesional.
+            """
+            
+            with st.spinner("Generando contenido académico..."):
+                response = model.generate_content(prompt_final)
+                
+                # Verificamos si la respuesta tiene texto (por si fue bloqueada)
+                if response.text:
+                    st.session_state['contenido'] = response.text
+                    st.markdown(response.text)
+                else:
+                    st.warning("El modelo no pudo generar una respuesta. Intenta cambiar un poco el tema.")
 
-# --- MÓDULO DE EXPORTACIÓN (PDF/TXT) ---
-if 'contenido' in st.session_state:
-    st.divider()
-    
-    def generar_pdf(texto, escuela, profe, logo):
-        pdf = FPDF()
-        pdf.add_page()
-        # Aquí la lógica para insertar el LOGO si existe
-        if logo:
-            pdf.image(logo, 10, 8, 33)
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(0, 10, escuela, ln=True, align='C')
-        pdf.set_font("Arial", size=10)
-        pdf.cell(0, 10, f"Profesor: {profe} | Nivel: {nivel}", ln=True, align='C')
-        pdf.ln(10)
-        pdf.multi_cell(0, 10, texto.encode('latin-1', 'replace').decode('latin-1'))
-        return pdf.output(dest='S').encode('latin-1')
-
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        st.download_button("📥 Descargar en PDF", 
-                          data=generar_pdf(st.session_state['contenido'], nombre_escuela, nombre_profe, logo_subido),
-                          file_name=f"Material_{tema}_{nivel}.pdf")
-    with col_btn2:
-        st.download_button("📄 Descargar en TXT", 
-                          data=st.session_state['contenido'],
-                          file_name=f"Material_{tema}_{nivel}.txt")
+        except Exception as e:
+            st.error(f"Se produjo un error técnico: {e}")
+            st.info("💡 Consejo: Revisa que tu API Key sea correcta y que tengas conexión a internet.")
