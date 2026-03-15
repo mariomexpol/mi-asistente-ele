@@ -3,24 +3,23 @@ import requests
 import json
 from fpdf import FPDF
 import tempfile
-import io
 
 st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
 
-# --- CLASE PDF PROFESIONAL ---
+# --- CLASE PDF PROFESIONAL CON SOPORTE DE CARACTERES ---
 class ELE_PDF(FPDF):
     def header(self):
         if hasattr(self, 'logo_path') and self.logo_path:
             self.image(self.logo_path, 10, 8, 30)
         self.set_font('helvetica', 'B', 15)
         self.set_x(45)
-        # Codificación para el nombre de la escuela
-        escuela_safe = self.nombre_escuela.encode('latin-1', 'replace').decode('latin-1')
-        self.cell(0, 10, escuela_safe, ln=True, align='L')
+        # Limpieza de caracteres para el encabezado
+        escuela_txt = self.nombre_escuela.encode('latin-1', 'replace').decode('latin-1')
+        self.cell(0, 10, escuela_txt, ln=True, align='L')
         self.ln(10)
 
     def write_markdown(self, txt):
-        """Procesa negritas ** y maneja caracteres latinos"""
+        """Procesa negritas ** y maneja acentos de forma segura"""
         parts = txt.split('**')
         for i, part in enumerate(parts):
             if i % 2 == 1:
@@ -28,11 +27,13 @@ class ELE_PDF(FPDF):
             else:
                 self.set_font('helvetica', '', 12)
             
-            # Limpieza y codificación para evitar el error de "string argument"
-            clean_part = part.encode('latin-1', 'replace').decode('latin-1')
-            self.write(7, clean_part)
+            # Reemplazos críticos para evitar que el PDF se rompa (0 KB)
+            clean = part.replace('–', '-').replace('—', '-').replace('¿', '?').replace('¡', '!')
+            # Codificación latin-1 obligatoria para FPDF básico
+            pdf_text = clean.encode('latin-1', 'replace').decode('latin-1')
+            self.write(7, pdf_text)
 
-def generar_pdf_profesional(texto, escuela, logo_path):
+def generar_pdf_seguro(texto, escuela, logo_path):
     pdf = ELE_PDF()
     pdf.nombre_escuela = escuela
     pdf.logo_path = logo_path
@@ -46,7 +47,7 @@ def generar_pdf_profesional(texto, escuela, logo_path):
             pdf.write_markdown(linea)
             pdf.ln(7)
     
-    # SALIDA BINARIA: Usamos 'bytearray' para que Streamlit no se confunda
+    # Salida en formato binario puro (bytearray)
     return pdf.output()
 
 # --- BARRA LATERAL ---
@@ -66,55 +67,62 @@ with st.sidebar:
 
 # --- INTERFAZ ---
 st.title("🎓 Generador ELE Pro")
-modo = st.radio("Selecciona:", ["Unidad con Texto Base", "Solo Lista de Ejercicios"], horizontal=True)
+modo = st.radio("Modo de trabajo:", ["Unidad Completa (Texto + Ejercicios)", "Solo Ejercicios"], horizontal=True)
 
 col1, col2 = st.columns(2)
 with col1:
-    tema = st.text_input("Tema de la clase")
+    tema = st.text_input("Tema detallado", placeholder="Ej: Impacto de la IA en la educación")
     nivel = st.selectbox("Nivel MCER", ["A1", "A2", "B1", "B2", "C1", "C2"])
-    if modo == "Unidad con Texto Base":
-        extension = st.select_slider("Extensión", options=["Corto", "Medio", "Largo (2 págs)", "Extenso (3 págs)"], value="Extenso (3 págs)")
-    cantidad = st.number_input("Cantidad de ejercicios", 1, 30, 15)
+    extension = st.select_slider("Extensión del texto base", options=["1 página", "2 páginas", "3 páginas (Extenso)"], value="3 páginas (Extenso)")
 
 with col2:
-    tecnicas = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas", "Ordenar frases"], default=["Test de Cloze", "Preguntas de comprensión"])
-    gramatica = st.multiselect("Gramática", ["Presente", "Pretéritos", "Subjuntivo", "Ser/Estar", "Vocabulario"], default=["Subjuntivo", "Pretéritos"])
+    cantidad = st.number_input("Cantidad de ítems por técnica", 1, 30, 15)
+    tecnicas = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Test de Cloze", "Preguntas de comprensión"])
+    gramatica = st.multiselect("Gramática", ["Presente", "Pretéritos", "Subjuntivo", "Ser/Estar"], default=["Subjuntivo"])
 
 if st.button("🚀 Generar Material"):
     if not api_key or not tema:
-        st.error("⚠️ Datos incompletos.")
+        st.error("⚠️ Datos faltantes")
     else:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={api_key.strip()}"
-        prompt = f"Actúa como profesor de {nombre_escuela}. Crea una unidad ELE de nivel {nivel} sobre '{tema}'. Mínimo 1500 palabras si hay texto. EXACTAMENTE {cantidad} ejercicios por técnica: {', '.join(tecnicas)}. Enfoque: {', '.join(gramatica)}. Firma: {nombre_profe}. Incluye soluciones."
         
-        with st.spinner("Generando contenido..."):
+        # PROMPT DE ALTA DENSIDAD: Forzamos la estructura de 3 páginas
+        prompt = f"""
+        Actúa como profesor de {nombre_escuela}. Genera una unidad ELE nivel {nivel} sobre '{tema}'.
+        
+        INSTRUCCIONES DE VOLUMEN (CRÍTICO):
+        1. TEXTO: Escribe un ensayo de 2000 palabras dividido en: Introducción, Antecedentes, Situación Actual, Impacto Social, Perspectivas Futuras y Conclusión. Cada sección debe ser muy larga.
+        2. EJERCICIOS: Crea exactamente {cantidad} ítems numerados para CADA una de estas técnicas: {', '.join(tecnicas)}. No omitas ninguno.
+        3. GRAMÁTICA: Aplica {', '.join(gramatica)}.
+        
+        Soluciones al final. Firma: {nombre_profe}.
+        """
+        
+        with st.spinner("Generando material extenso... Esto puede tardar hasta 90 segundos."):
             try:
                 r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
                 st.session_state['material_final'] = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-                st.success("¡Material generado!")
+                st.success("¡Material generado con éxito!")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error en la IA: {e}")
 
-# --- SECCIÓN DE DESCARGAS ---
 if 'material_final' in st.session_state:
     st.divider()
     st.markdown(st.session_state['material_final'])
     
-    col_txt, col_pdf = st.columns(2)
-    with col_txt:
-        st.download_button("📥 Descargar TXT", data=st.session_state['material_final'], file_name=f"Material_{tema}.txt")
-    
-    with col_pdf:
-        try:
-            # Generamos el PDF directamente a memoria de bytes
-            pdf_data = generar_pdf_profesional(st.session_state['material_final'], nombre_escuela, logo_path)
-            
-            # El objeto devuelto por pdf.output() en fpdf2 ya es binario
+    # Generamos el PDF capturando la salida binaria
+    try:
+        pdf_output = generar_pdf_seguro(st.session_state['material_final'], nombre_escuela, logo_path)
+        
+        col_txt, col_pdf = st.columns(2)
+        with col_txt:
+            st.download_button("📥 Descargar TXT", data=st.session_state['material_final'], file_name=f"Material_{tema}.txt")
+        with col_pdf:
             st.download_button(
                 label="📄 Descargar PDF Profesional",
-                data=pdf_data,
+                data=bytes(pdf_output), # Convertimos a bytes explícitamente
                 file_name=f"Material_{tema}.pdf",
                 mime="application/pdf"
             )
-        except Exception as e:
-            st.error(f"Error al procesar el PDF: {e}")
+    except Exception as e:
+        st.error(f"Error técnico al preparar la descarga: {e}")
