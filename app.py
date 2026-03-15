@@ -20,7 +20,7 @@ if st.button("🚀 Generar Material"):
         st.error("Por favor, introduce la API Key y el tema.")
     else:
         # CONEXIÓN DIRECTA POR HTTP (Evita el error 404 v1beta)
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key.strip()}"
         
         payload = {
             "contents": [{
