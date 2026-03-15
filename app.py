@@ -1,35 +1,68 @@
 import streamlit as st
 import google.generativeai as genai
+import os
 
-st.title("Asistente de Profesor de Español")
+st.set_page_config(page_title="Asistente E/LE Pro", layout="wide")
 
-# Configuración básica en la página principal (más seguro)
-api_key = st.text_input("1. Pega tu API Key de Google AI Studio", type="password")
-escuela = st.text_input("2. Nombre de tu Escuela", "Mi Escuela")
-tema = st.text_input("3. Tema de la clase (ej. El Subjuntivo)")
-nivel = st.selectbox("4. Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
-cantidad = st.slider("5. Número de ejercicios", 1, 20, 10)
+# --- BARRA LATERAL ---
+with st.sidebar:
+    st.header("🏫 Configuración")
+    logo_file = st.file_uploader("Subir logo", type=["png", "jpg", "jpeg"])
+    if logo_file:
+        st.image(logo_file, width=150)
+    nombre_escuela = st.text_input("Escuela", "Mi Escuela de Español")
+    api_key = st.text_input("API Key de Gemini", type="password")
 
-if st.button("🚀 Crear Material"):
-    if not api_key or not tema:
-        st.error("Faltan datos por rellenar.")
+# --- INTERFAZ ---
+st.title("🎓 Generador de Materiales E/LE")
+
+col1, col2 = st.columns(2)
+with col1:
+    nivel = st.selectbox("Nivel MCER", ["A1", "A2", "B1", "B2", "C1", "C2"])
+    tema = st.text_input("Tema de la clase")
+    modulo = st.radio("Módulo", ["Ejercicios", "Texto con Preguntas"])
+
+with col2:
+    cantidad = st.number_input("Cantidad", min_value=1, value=10)
+    tecnicas = st.multiselect("Técnicas", 
+        ["Test de Cloze", "Rellenar huecos", "Traducción", "Corregir errores", "Ordenar frases", "Relacionar"])
+
+if st.button("🚀 Generar Material"):
+    if not api_key:
+        st.error("Introduce la API Key")
     else:
         try:
-            # Conexión limpia
-            genai.configure(api_key=api_key.strip())
+            # CONFIGURACIÓN DE SEGURIDAD
+            os.environ["GOOGLE_API_KEY"] = api_key.strip()
+            genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+            
+            # Forzamos la búsqueda de modelos disponibles para evitar el 404
             model = genai.GenerativeModel('gemini-1.5-flash')
             
-            prompt = f"Actúa como profesor de español. Escuela: {escuela}. Nivel {nivel}. Tema: {tema}. Cantidad: {cantidad}. Incluye ejercicios tipo test de cloze, gramática y soluciones."
+            prompt = f"Como profesor de español experto, crea material nivel {nivel} sobre {tema}. Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}. Escuela: {nombre_escuela}. Incluye soluciones y explicaciones."
             
-            with st.spinner("Generando..."):
+            with st.spinner("Generando contenido..."):
                 response = model.generate_content(prompt)
-                st.session_state['resultado'] = response.text
-                st.success("¡Hecho!")
+                if response.text:
+                    st.session_state['contenido'] = response.text
+                    st.success("¡Generado con éxito!")
+                else:
+                    st.error("La IA no devolvió texto.")
+                    
         except Exception as e:
-            st.error(f"Error: {e}")
+            # Si falla, probamos con el nombre largo oficial
+            try:
+                model_alt = genai.GenerativeModel('models/gemini-pro')
+                response = model_alt.generate_content(prompt)
+                st.session_state['contenido'] = response.text
+                st.success("Generado con modelo Pro")
+            except Exception as e2:
+                st.error(f"Error final de Google: {e2}")
+                st.info("Nota: Revisa si tu API Key es de 'Google AI Studio'. Las de 'Google Cloud Vertex AI' no funcionan con este código.")
 
-if 'resultado' in st.session_state:
-    st.markdown("---")
-    st.write(f"### Material para {escuela}")
-    st.write(st.session_state['resultado'])
-    st.download_button("Descargar Material", st.session_state['resultado'], file_name="clase.txt")
+# --- RESULTADO ---
+if 'contenido' in st.session_state:
+    st.divider()
+    st.subheader(f"📄 {nombre_escuela}")
+    st.markdown(st.session_state['contenido'])
+    st.download_button("📥 Descargar TXT", st.session_state['contenido'], file_name="material.txt")
