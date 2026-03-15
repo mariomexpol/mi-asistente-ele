@@ -23,16 +23,26 @@ if st.button("🚀 Generar"):
         st.error("Introduce la API Key")
     else:
         try:
-            genai.configure(api_key=api_key.strip())
-            model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
-            prompt = f"Actúa como profesor de español. Crea material nivel {nivel} sobre {tema}. Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}. Incluye soluciones y explicaciones pedagógicas."
+            # Limpiamos la llave
+            llave = api_key.strip()
+            genai.configure(api_key=llave)
             
-            with st.spinner("Generando..."):
+            # Usamos el nombre simplificado que funciona en la API v1
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            prompt = f"Actúa como profesor de español experto. Crea material nivel {nivel} sobre {tema}. Módulo: {modulo}. Técnicas: {tecnicas}. Cantidad: {cantidad}. Incluye soluciones y explicaciones pedagógicas."
+            
+            with st.spinner("Generando contenido pedagógico..."):
+                # Forzamos la generación
                 response = model.generate_content(prompt)
-                st.session_state['texto'] = response.text
-                st.markdown(response.text)
+                
+                if response and response.text:
+                    st.session_state['texto'] = response.text
+                    st.success("¡Material listo!")
+                    st.markdown(response.text)
+                else:
+                    st.error("El modelo respondió pero no contiene texto. Revisa los filtros de seguridad.")
+                    
         except Exception as e:
-            st.error(f"Error: {e}")
-
-if 'texto' in st.session_state:
-    st.download_button("📥 Descargar TXT", st.session_state['texto'], file_name="material.txt")
+            # Este mensaje nos dirá si es un problema de la LLAVE o del MODELO
+            st.error(f"Error técnico: {e}") 
