@@ -1,6 +1,5 @@
 import streamlit as st
 import google.generativeai as genai
-from google.generativeai.types import RequestOptions
 
 st.set_page_config(page_title="Asistente E/LE", layout="wide")
 
@@ -22,20 +21,17 @@ if st.button("🚀 Generar Material"):
         st.error("Falta la llave o el tema")
     else:
         try:
-            # CONFIGURACIÓN CLAVE: Forzamos la versión v1
+            # Configuración simple
             genai.configure(api_key=api_key.strip())
             
-            # Usamos el modelo flash con la opción de versión estable
+            # Usamos el modelo flash
             model = genai.GenerativeModel('gemini-1.5-flash')
             
-            prompt = f"Como profesor de español, crea {cantidad} ejercicios nivel {nivel} sobre {tema}. Incluye soluciones. Escuela: {nombre_escuela}."
+            prompt = f"Actúa como profesor de español. Crea {cantidad} ejercicios nivel {nivel} sobre {tema}. Incluye soluciones. Escuela: {nombre_escuela}."
             
-            with st.spinner("Generando contenido estable..."):
-                # TRUCO: Aquí forzamos la API v1 que no da error 404
-                response = model.generate_content(
-                    prompt, 
-                    request_options={"api_version": "v1"}
-                )
+            with st.spinner("Generando contenido..."):
+                # Llamada estándar sin opciones complejas
+                response = model.generate_content(prompt)
                 
                 if response.text:
                     st.success("¡Logrado!")
@@ -45,7 +41,7 @@ if st.button("🚀 Generar Material"):
                     st.error("La IA no devolvió texto.")
                     
         except Exception as e:
-            st.error(f"Error de conexión: {e}")
+            st.error(f"Error: {e}")
 
 if 'resultado' in st.session_state:
     st.download_button("Descargar TXT", st.session_state['resultado'], file_name="material.txt")
