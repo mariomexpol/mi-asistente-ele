@@ -55,7 +55,7 @@ if st.button("🚀 Generar Material"):
             ]
             
             model = genai.GenerativeModel(
-                model_name='gemini-1.5-flash',
+                model_name='gemini-pro',
                 safety_settings=safety_settings
             )
             
