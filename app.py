@@ -1,107 +1,108 @@
 import streamlit as st
 import requests
 import json
-from fpdf import FPDF
-import tempfile
 
+# Configuración de la página
 st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
 
-# --- CLASE PDF PROFESIONAL REFORZADA ---
-class ELE_PDF(FPDF):
-    def header(self):
-        # Logo institucional (si existe)
-        if hasattr(self, 'logo_path') and self.logo_path:
-            self.image(self.logo_path, 10, 8, 30)
-        
-        # Membrete de la Escuela
-        self.set_font('helvetica', 'B', 16)
-        self.set_text_color(44, 62, 80) # Azul oscuro profesional
-        self.set_x(45)
-        self.cell(0, 10, self.nombre_escuela, ln=True, align='L')
-        
-        self.set_font('helvetica', 'I', 10)
-        self.set_x(45)
-        self.cell(0, 5, "Material Didáctico de Español", ln=True, align='L')
-        self.ln(10)
-        self.line(10, 35, 200, 35) # Línea divisoria decorativa
-        self.ln(5)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('helvetica', 'I', 8)
-        self.set_text_color(128, 128, 128)
-        self.cell(0, 10, f'Página {self.page_no()} | Generado por Asistente ELE Pro', align='C')
-
-    def chapter_title(self, label):
-        self.set_font('helvetica', 'B', 14)
-        self.set_text_color(192, 57, 43) # Rojo elegante para títulos
-        self.cell(0, 10, label.upper(), ln=True)
-        self.ln(4)
-
-    def write_body(self, text):
-        self.set_font('helvetica', '', 11)
-        self.set_text_color(0, 0, 0)
-        # Procesamiento de negritas reales para el PDF
-        parts = text.split('**')
-        for i, part in enumerate(parts):
-            if i % 2 == 1:
-                self.set_font('helvetica', 'B', 11)
-            else:
-                self.set_font('helvetica', '', 11)
-            
-            clean_text = part.encode('latin-1', 'replace').decode('latin-1')
-            self.write(7, clean_text)
-
-def generar_pdf_editorial(texto, escuela, logo_path):
-    pdf = ELE_PDF()
-    pdf.nombre_escuela = escuela
-    pdf.logo_path = logo_path
-    pdf.add_page()
-    
-    lineas = texto.split('\n')
-    for linea in lineas:
-        if linea.startswith('###'):
-            pdf.ln(5)
-            pdf.chapter_title(linea.replace('###', '').strip())
-        elif linea.strip() == "":
-            pdf.ln(4)
-        else:
-            pdf.write_body(linea)
-            pdf.ln(7)
-            
-    return pdf.output()
-
-# --- INTERFAZ STREAMLIT (SECCIÓN DE CONFIGURACIÓN) ---
+# --- BARRA LATERAL: CONFIGURACIÓN ---
 with st.sidebar:
-    st.header("🏫 Configuración")
-    logo_file = st.file_uploader("Subir logo", type=["png", "jpg", "jpeg"])
-    logo_path = None
-    if logo_file:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-            tmp.write(logo_file.getvalue())
-            logo_path = tmp.name
-        st.image(logo_file, width=150)
+    st.header("🏫 Configuración Institucional")
+    nombre_escuela = st.text_input("Nombre de la Escuela", "El Sabor de la Lengua")
+    nombre_profe = st.text_input("Nombre del Profesor/a", "Mario")
+    api_key = st.text_input("API Key (Gemini)", type="password")
+    st.info("📋 Instrucciones: Genera el material, descarga el TXT y usa 'Imprimir > PDF' en tu iPad para la versión final.")
+
+# --- INTERFAZ PRINCIPAL ---
+st.title("🎓 Generador ELE Pro: Edición Profesional")
+modo = st.radio("Modo de trabajo:", ["Unidad Completa (Texto + Ejercicios)", "Solo Ejercicios"], horizontal=True)
+
+st.divider()
+
+col1, col2 = st.columns(2)
+
+with col1:
+    tema = st.text_input("Tema de la clase", placeholder="Ej: La gastronomía de Oaxaca o El impacto de la tecnología")
+    nivel = st.selectbox("Nivel MCER", ["A1", "A2", "B1", "B2", "C1", "C2"])
     
-    nombre_escuela = st.text_input("Escuela", "El Sabor de la Lengua")
-    nombre_profe = st.text_input("Profesor/a", "Mario")
-    api_key = st.text_input("API Key", type="password")
+    # Selector de extensión recuperado y estable
+    opciones_ext = ["Corto (150 palabras)", "Medio (1 página)", "Largo (2 páginas)", "Extenso (3 páginas)"]
+    if modo == "Unidad Completa (Texto + Ejercicios)":
+        extension = st.select_slider("Selecciona la extensión del texto base", options=opciones_ext, value="Extenso (3 páginas)")
+    
+    cantidad = st.number_input("Cantidad de ejercicios por técnica", min_value=1, max_value=30, value=15)
 
-st.title("🎓 Generador ELE Pro: Edición Editorial")
+with col2:
+    # Selector de técnicas pedagógicas
+    tecnicas = st.multiselect("Técnicas pedagógicas a incluir", 
+                             ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", 
+                              "Corregir errores", "Relacionar columnas", "Ordenar frases"],
+                             default=["Test de Cloze", "Preguntas de comprensión"])
+    
+    # Selector de gramática y VOCABULARIO recuperado
+    gramatica_vocab = st.multiselect("Enfoque Gramática / Vocabulario", 
+                            ["Presente", "Pretéritos", "Subjuntivo", "Ser/Estar", "Por/Para", "Vocabulario"],
+                            default=["Subjuntivo", "Vocabulario"])
 
-# ... (Mantenemos los selectores de Tema, Nivel y Extensión anteriores) ...
+# --- PROCESO DE GENERACIÓN ---
+if st.button("🚀 Generar Material Profesional"):
+    if not api_key or not tema:
+        st.error("⚠️ Por favor, introduce la API Key y el tema de la clase.")
+    elif not tecnicas:
+        st.warning("⚠️ Debes seleccionar al menos una técnica pedagógica.")
+    else:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={api_key.strip()}"
+        
+        # Prompt optimizado para TXT de alta calidad y extensión real
+        if modo == "Unidad Completa (Texto + Ejercicios)":
+            detalles_longitud = "Escribe un artículo de fondo extremadamente detallado de al menos 2000 palabras, dividido en 6 capítulos narrativos."
+        else:
+            detalles_longitud = "Crea una lista directa de ejercicios sin texto previo."
 
-if st.button("🚀 Crear Material de Alta Calidad"):
-    # ... (Mismo flujo de llamada a la API de Gemini) ...
-    pass
+        prompt = f"""
+        Actúa como un autor experto de libros de texto para la escuela {nombre_escuela}.
+        Misión: Generar una unidad didáctica de nivel {nivel} sobre '{tema}'.
+        
+        ESTRUCTURA DEL ARCHIVO TXT PROFESIONAL:
+        1. ENCABEZADO:
+           ****************************************************
+           ESCUELA: {nombre_escuela}
+           PROFESOR: {nombre_profe}
+           ****************************************************
+        
+        2. DESARROLLO:
+           {detalles_longitud}
+           Usa subtítulos en MAYÚSCULAS y líneas divisorias (====================).
+        
+        3. PRÁCTICA:
+           Genera exactamente {cantidad} ejercicios para cada una de estas técnicas: {', '.join(tecnicas)}.
+           Asegúrate de evaluar: {', '.join(gramatica_vocab)}.
+        
+        4. SOLUCIONARIO:
+           Incluye todas las respuestas detalladas al final del documento.
+        """
+        
+        with st.spinner("Generando contenido extenso de alta calidad..."):
+            try:
+                r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
+                res_json = r.json()
+                if "candidates" in res_json:
+                    st.session_state['material_final'] = res_json["candidates"][0]["content"]["parts"][0]["text"]
+                    st.success("¡Material generado correctamente!")
+                else:
+                    st.error("Hubo un problema con la respuesta de la IA. Revisa tu API Key.")
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
 
+# --- VISUALIZACIÓN Y DESCARGA ---
 if 'material_final' in st.session_state:
     st.divider()
-    # Generamos los bytes del PDF profesional
-    pdf_bytes = generar_pdf_editorial(st.session_state['material_final'], nombre_escuela, logo_path)
+    st.text_area("Vista previa del material (Formato TXT Pro):", st.session_state['material_final'], height=500)
     
+    # Descarga de TXT compatible con iPad
     st.download_button(
-        label="📄 Descargar PDF de Calidad Editorial",
-        data=pdf_bytes,
-        file_name=f"Clase_ELE_{nombre_profe}.pdf",
-        mime="application/pdf"
+        label="📥 Descargar TXT Profesional para iPad",
+        data=st.session_state['material_final'],
+        file_name=f"Clase_ELE_{tema.replace(' ', '_')}.txt",
+        mime="text/plain"
     )
