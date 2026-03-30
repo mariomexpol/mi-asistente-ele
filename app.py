@@ -97,8 +97,8 @@ if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
         st.error("⚠️ Configuración incompleta.")
     else:
-        # URL CERTIFICADA PARA 2026: v1 con gemini-1.5-flash-latest
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key={api_key.strip()}"
+        # URL OPTIMIZADA PARA USUARIOS AI PRO (v1 con gemini-1.5-pro-latest)
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-latest:generateContent?key={api_key.strip()}"
         
         detalles = f"Texto de {ext} (mínimo 2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
         
@@ -108,21 +108,18 @@ if st.button("🚀 Generar Material Editorial"):
                   f"IMPORTANTE: Al final, incluye siempre una sección llamada '# SOLUCIONARIO' con todas las respuestas. "
                   f"Tablas: 'A | B'. Firma: {nombre_profe}.")
         
-        with st.spinner("Conectando con los servidores de Google..."):
+        with st.spinner("Accediendo a la potencia de Gemini Pro..."):
             try:
-                # Usamos el modelo flash-latest que es el más estable para v1
-                response = requests.post(
-                    url, 
-                    json={"contents": [{"parts": [{"text": prompt}]}]}, 
-                    headers={'Content-Type': 'application/json'},
-                    timeout=120
-                )
+                headers = {'Content-Type': 'application/json'}
+                payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                
+                # Timeout extendido a 180 seg porque Gemini Pro genera mucho más contenido
+                response = requests.post(url, json=payload, headers=headers, timeout=180)
                 
                 if response.status_code == 200:
                     st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    st.success("¡Conexión establecida! Material generado.")
+                    st.success("¡Conexión Pro establecida! Material de alta calidad generado.")
                 else:
-                    # Este mensaje nos dirá si hay un problema de cuota o de región
                     st.error(f"Error {response.status_code}: {response.text}")
             except Exception as e:
                 st.error(f"Error de red: {e}")
