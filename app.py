@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+import google.generativeai as genai
 import io
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches
@@ -79,42 +79,41 @@ col1, col2 = st.columns(2)
 with col1:
     tema_input = st.text_input("Tema de la unidad")
     nivel_mcer = st.selectbox("Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
-    ext = "Corto"
+    ext_val = "Corto"
     if modo == "Unidad Completa (Texto + Ejercicios)":
-        ext = st.select_slider("Extensión", ["Corto", "1 pág", "2 págs", "3 págs (Extenso)"], "3 págs (Extenso)")
+        ext_val = st.select_slider("Extensión", ["Corto", "1 pág", "2 págs", "3 págs (Extenso)"], "3 págs (Extenso)")
 
 with col2:
-    items = st.number_input("Items por técnica", 1, 30, 15)
-    tecnicas_sel = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
-    gram_sel = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Presente de Subjuntivo", "Pretérito Imperfecto de Subjuntivo", "Condicional Simple", "Condicional Compuesto", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
+    items_val = st.number_input("Items por técnica", 1, 30, 15)
+    tecs_val = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
+    gram_val = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Presente de Subjuntivo", "Pretérito Imperfecto de Subjuntivo", "Condicional Simple", "Condicional Compuesto", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
 
 # --- GENERACIÓN ---
 if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
         st.error("⚠️ Configuración incompleta.")
     else:
-        # URL OPTIMIZADA PARA CUENTAS PRO
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key.strip()}"
-        
-        detalles = f"Texto de {ext} (2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
-        
-        prompt = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                  f"Requisitos: {detalles}. Sección '# VOCABULARIO CLAVE'. "
-                  f"Crea {items} ejercicios por técnica: {', '.join(tecnicas_sel)}. "
-                  f"Enfoque gramatical: {', '.join(gram_sel)}. "
-                  f"IMPORTANTE: Al final, incluye siempre '# SOLUCIONARIO' con todas las respuestas. "
-                  f"Firma: {nombre_profe}.")
-        
-        with st.spinner("Generando contenido con Gemini 1.5 Pro..."):
-            try:
-                response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=240)
-                if response.status_code == 200:
-                    st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    st.success("¡Material generado con éxito!")
-                else:
-                    st.error(f"Error {response.status_code}: {response.text}")
-            except Exception as e:
-                st.error(f"Error de conexión: {e}")
+        try:
+            # Configuración de la librería oficial
+            genai.configure(api_key=api_key.strip())
+            # Usamos el modelo Pro que corresponde a tu suscripción de 2TB
+            model = genai.GenerativeModel('gemini-1.5-pro')
+            
+            detalles_p = f"Texto de {ext_val} (2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
+            
+            prompt_p = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
+                      f"Requisitos: {detalles_p}. Sección '# VOCABULARIO CLAVE'. "
+                      f"Crea {items_val} ejercicios por técnica: {', '.join(tecs_val)}. "
+                      f"Enfoque gramatical: {', '.join(gram_val)}. "
+                      f"IMPORTANTE: Al final, incluye siempre '# SOLUCIONARIO' con todas las respuestas. "
+                      f"Firma: {nombre_profe}.")
+            
+            with st.spinner("Generando contenido con tu suscripción Google AI Pro..."):
+                response = model.generate_content(prompt_p)
+                st.session_state['material_ia'] = response.text
+                st.success("¡Material generado con éxito!")
+        except Exception as e:
+            st.error(f"Error detectado: {e}")
 
 if 'material_ia' in st.session_state:
     st.divider()
