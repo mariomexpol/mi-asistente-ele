@@ -7,9 +7,11 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
 
+# --- LIMPIEZA DE CARACTERES ---
 def limpiar_texto_ele(texto):
     return texto.replace('\\_', '_').replace('\\', '')
 
+# --- CONSTRUCCIÓN DEL DOCUMENTO WORD ---
 def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     doc = Document()
     section = doc.sections[0]
@@ -35,13 +37,13 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
         l = linea.strip()
         if not l: continue
         
-        # Detección de títulos y salto de página para el Solucionario
+        # Títulos y Salto de página para el Solucionario
         if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper() or "EJERCICIOS" in l.upper():
             if "SOLUCIONARIO" in l.upper(): doc.add_page_break()
             doc.add_heading(l.replace('#', '').strip(), level=1)
             continue
             
-        # Generación de Tablas
+        # Tablas de Relacionar (formato A | B)
         if '|' in l and '---' not in l:
             datos = [c.strip() for c in l.split('|') if c.strip()]
             if len(datos) >= 2:
@@ -64,40 +66,54 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     doc.save(bio)
     return bio.getvalue()
 
+# --- BARRA LATERAL (CONFIGURACIÓN) ---
 with st.sidebar:
     st.header("🏫 Configuración")
-    logo_subido = st.file_uploader("Logo", type=["png", "jpg", "jpeg"])
+    logo_subido = st.file_uploader("Subir logo", type=["png", "jpg", "jpeg"])
     nombre_escuela = st.text_input("Escuela", "El Sabor de la Lengua")
     nombre_profe = st.text_input("Profesor/a", "Mario")
-    api_key = st.text_input("API Key", type="password")
+    api_key = st.text_input("API Key (Gemini)", type="password")
 
+# --- INTERFAZ PRINCIPAL ---
 st.title("🎓 Generador ELE Pro")
-tema_input = st.text_input("Tema de la unidad")
-nivel_mcer = st.selectbox("Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
+modo = st.selectbox("Selecciona modo", ["Unidad Completa (Texto + Ejercicios)", "Solo Lista de Ejercicios"])
+
+st.divider()
 
 col1, col2 = st.columns(2)
 with col1:
-    items_v = st.number_input("Items por técnica", 1, 30, 15)
-with col2:
-    tecs_v = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
+    tema_input = st.text_input("Tema de la unidad")
+    nivel_mcer = st.selectbox("Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
+    ext_val = "Corto"
+    if modo == "Unidad Completa (Texto + Ejercicios)":
+        ext_val = st.select_slider("Extensión", ["Corto", "1 pág", "2 págs", "3 págs (Extenso)"], "3 págs (Extenso)")
 
+with col2:
+    items_val = st.number_input("Items por técnica", 1, 30, 15)
+    tecs_val = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
+    gram_val = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Subjuntivo", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
+
+# --- GENERACIÓN ---
 if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
         st.error("⚠️ Configuración incompleta.")
     else:
         try:
-            # CAMBIO CRÍTICO: Usamos la configuración estándar
+            # CONFIGURACIÓN ESTABLE v1
             genai.configure(api_key=api_key.strip())
-            # Usamos el modelo sin el prefijo de versión para que Google elija la mejor ruta
+            # Usamos gemini-1.5-flash para máxima compatibilidad regional
             model = genai.GenerativeModel('gemini-1.5-flash')
             
-            prompt_p = (f"Actúa como autor de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                      f"Crea {items_v} ejercicios por cada técnica: {', '.join(tecs_v)}. "
-                      f"INSTRUCCIÓN DE FORMATO: En los ejercicios NO escribas las respuestas. "
-                      f"Usa '_______' para los huecos. Mueve todas las soluciones al final "
-                      f"bajo el título '# SOLUCIONARIO'. Firma: {nombre_profe}.")
+            prompt_p = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
+                      f"Genera un texto de {ext_val} y {items_val} ejercicios por cada técnica: {', '.join(tecs_val)}. "
+                      f"Enfoque gramatical: {', '.join(gram_val)}. "
+                      f"REGLAS ESTRICTAS DE FORMATO:\n"
+                      f"1. En los ejercicios NO escribas la respuesta. Usa líneas '_______' para los huecos.\n"
+                      f"2. En 'Relacionar columnas', desordena la columna B.\n"
+                      f"3. Crea una sección final titulada '# SOLUCIONARIO' con todas las respuestas.\n"
+                      f"Firma: {nombre_profe}.")
             
-            with st.spinner("Generando contenido limpio..."):
+            with st.spinner("Generando contenido limpio y profesional..."):
                 response = model.generate_content(prompt_p)
                 st.session_state['material_ia'] = response.text
                 st.success("¡Material generado con éxito!")
@@ -107,5 +123,5 @@ if st.button("🚀 Generar Material Editorial"):
 if 'material_ia' in st.session_state:
     st.divider()
     docx_bytes = generar_docx_profesional(st.session_state['material_ia'], nombre_escuela, nombre_profe, tema_input, logo_file=logo_subido)
-    st.download_button("📥 Descargar Word con Soluciones", data=docx_bytes, file_name=f"ELE_{tema_input}.docx")
+    st.download_button("📥 Descargar Word Profesional", data=docx_bytes, file_name=f"ELE_{tema_input}.docx")
     st.markdown(st.session_state['material_ia'])
