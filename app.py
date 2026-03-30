@@ -95,34 +95,37 @@ with col2:
 
 if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
-        st.error("⚠️ Configuración incompleta.")
+        st.error("⚠️ Configuración incompleta (Falta API Key o Tema).")
     else:
-        # URL OPTIMIZADA PARA USUARIOS AI PRO (v1 con gemini-1.5-pro-latest)
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-latest:generateContent?key={api_key.strip()}"
+        # URL DEFINITIVA PARA CUENTAS PRO: v1beta con gemini-1.5-pro
+        # Esta combinación es la más potente y compatible para textos de 3 páginas
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key.strip()}"
         
-        detalles = f"Texto de {ext} (mínimo 2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
+        prompt = (f"Actúa como autor experto de la escuela {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
+                  f"Requisitos: Sección '# VOCABULARIO CLAVE', texto muy extenso de 3 páginas (mínimo 2000 palabras), "
+                  f"y {items} ejercicios por técnica: {', '.join(tec)}. "
+                  f"Enfoque gramatical: {', '.join(gram)}. "
+                  f"IMPORTANTE: Incluye siempre '# SOLUCIONARIO' al final en una página nueva. "
+                  f"Tablas de relacionar: 'Concepto | Definición'. Firma: {nombre_profe}.")
         
-        prompt = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                  f"Requisitos: {detalles}. Sección '# VOCABULARIO CLAVE'. "
-                  f"Crea {items} ejercicios por técnica: {', '.join(tecs)}. Enfoque: {', '.join(gram)}. "
-                  f"IMPORTANTE: Al final, incluye siempre una sección llamada '# SOLUCIONARIO' con todas las respuestas. "
-                  f"Tablas: 'A | B'. Firma: {nombre_profe}.")
-        
-        with st.spinner("Accediendo a la potencia de Gemini Pro..."):
+        with st.spinner("Accediendo a la potencia de Gemini 1.5 Pro..."):
             try:
                 headers = {'Content-Type': 'application/json'}
                 payload = {"contents": [{"parts": [{"text": prompt}]}]}
                 
-                # Timeout extendido a 180 seg porque Gemini Pro genera mucho más contenido
-                response = requests.post(url, json=payload, headers=headers, timeout=180)
+                # Aumentamos el tiempo de espera a 240 segundos (4 minutos) 
+                # debido a que el modelo Pro genera mucho más detalle.
+                response = requests.post(url, json=payload, headers=headers, timeout=240)
                 
                 if response.status_code == 200:
                     st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    st.success("¡Conexión Pro establecida! Material de alta calidad generado.")
+                    st.success("¡Conexión Pro exitosa! Unidad generada.")
                 else:
+                    # Si falla, el error nos dirá exactamente qué falta
                     st.error(f"Error {response.status_code}: {response.text}")
+                    
             except Exception as e:
-                st.error(f"Error de red: {e}")
+                st.error(f"Error de conexión: {e}")
 if 'material_ia' in st.session_state:
     st.divider()
     docx_bytes = generar_docx_profesional(st.session_state['material_ia'], nombre_escuela, nombre_profe, tema_input, logo_file=logo_subido)
