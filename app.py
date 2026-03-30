@@ -9,9 +9,10 @@ st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
 
 # --- FUNCIÓN DE LIMPIEZA ---
 def limpiar_texto_ele(texto):
+    # Limpia los caracteres que ensucian los huecos de los ejercicios [cite: 1012, 1013]
     return texto.replace('\\_', '_').replace('\\', '')
 
-# --- GENERADOR DOCX ---
+# --- GENERADOR DOCX PROFESIONAL ---
 def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     doc = Document()
     section = doc.sections[0]
@@ -36,10 +37,14 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     for linea in lineas:
         l = linea.strip()
         if not l: continue
+        
+        # Formato de Títulos y Salto de página para Solucionario [cite: 1342, 1411]
         if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper():
             if "SOLUCIONARIO" in l.upper(): doc.add_page_break()
             doc.add_heading(l.replace('#', '').strip(), level=1)
             continue
+            
+        # Creación de Tablas de Relacionar Columnas [cite: 1023, 1036]
         if '|' in l and '---' not in l:
             datos = [c.strip() for c in l.split('|') if c.strip()]
             if len(datos) >= 2:
@@ -49,6 +54,7 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
                 cells[0].text = datos[0]
                 cells[1].text = datos[1]
                 continue
+
         p = doc.add_paragraph()
         partes = l.split('**')
         for i, parte in enumerate(partes):
@@ -94,21 +100,20 @@ if st.button("🚀 Generar Material Editorial"):
         st.error("⚠️ Configuración incompleta.")
     else:
         try:
-            # Configuración de la librería oficial
+            # Configuración con el modelo Flash (el más compatible para evitar el error 404)
             genai.configure(api_key=api_key.strip())
-            # Usamos el modelo Pro que corresponde a tu suscripción de 2TB
-            model = genai.GenerativeModel('gemini-1.5-pro')
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
-            detalles_p = f"Texto de {ext_val} (2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
+            detalles_p = f"Texto de {ext_val} (mínimo 2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
             
             prompt_p = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
                       f"Requisitos: {detalles_p}. Sección '# VOCABULARIO CLAVE'. "
                       f"Crea {items_val} ejercicios por técnica: {', '.join(tecs_val)}. "
                       f"Enfoque gramatical: {', '.join(gram_val)}. "
-                      f"IMPORTANTE: Al final, incluye siempre '# SOLUCIONARIO' con todas las respuestas. "
+                      f"IMPORTANTE: Al final, incluye siempre una sección llamada '# SOLUCIONARIO' con todas las respuestas. "
                       f"Firma: {nombre_profe}.")
             
-            with st.spinner("Generando contenido con tu suscripción Google AI Pro..."):
+            with st.spinner("Generando contenido de alta calidad..."):
                 response = model.generate_content(prompt_p)
                 st.session_state['material_ia'] = response.text
                 st.success("¡Material generado con éxito!")
