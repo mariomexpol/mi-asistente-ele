@@ -56,54 +56,49 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     return bio.getvalue()
 
 with st.sidebar:
-    st.header("Configuración")
-    logo_subido = st.file_uploader("Logo", type=["png", "jpg", "jpeg"])
+    st.header("🏫 Configuración")
+    logo_subido = st.file_uploader("Logo de la escuela", type=["png", "jpg", "jpeg"])
     nombre_escuela = st.text_input("Escuela", "El Sabor de la Lengua")
-    nombre_profe = st.text_input("Profesor", "Mario")
-    api_key = st.text_input("API Key (Google AI Studio)", type="password")
+    nombre_profe = st.text_input("Profesor/a", "Mario")
+    api_key = st.text_input("API Key (Gemini)", type="password")
 
 st.title("🎓 Generador ELE Pro")
 modo = st.selectbox("Modo", ["Unidad Completa", "Solo Ejercicios"])
-tema_input = st.text_input("Tema")
+tema_input = st.text_input("Tema de la unidad")
 nivel_mcer = st.selectbox("Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
+
 col1, col2 = st.columns(2)
 with col1:
-    items = st.number_input("Ejercicios por técnica", 1, 30, 15)
+    items = st.number_input("Items por técnica", 1, 30, 15)
 with col2:
-    tec = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas"])
+    tec = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
+    gram = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Presente de Subjuntivo", "Pretérito Imperfecto de Subjuntivo", "Condicional Simple", "Condicional Compuesto", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
 
 if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
-        st.error("⚠️ Configuración incompleta (Falta API Key o Tema).")
+        st.error("⚠️ Configuración incompleta.")
     else:
-        # URL UNIVERSAL Y ESTABLE (v1)
-        # Usamos gemini-1.5-flash que tiene la mayor compatibilidad actual
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
+        # URL DEFINITIVA: v1beta es necesaria para gemini-1.5-flash en muchas regiones
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
         
         prompt = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                  f"Requisitos: Sección '# VOCABULARIO CLAVE', texto extenso de 3 páginas (2000 palabras), "
-                  f"y {items} ejercicios por técnica: {', '.join(tec)}. "
-                  f"Incluye siempre '# SOLUCIONARIO' al final. Firma: {nombre_profe}.")
+                  f"Requisitos: Sección '# VOCABULARIO CLAVE', texto extenso si aplica, y {items} ejercicios por técnica: {', '.join(tec)}. "
+                  f"Enfoque: {', '.join(gram)}. Incluye siempre '# SOLUCIONARIO' al final. Firma: {nombre_profe}.")
         
-        with st.spinner("Conectando con Google AI (v1)..."):
+        with st.spinner("Generando contenido profesional..."):
             try:
-                headers = {'Content-Type': 'application/json'}
-                payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                
-                response = requests.post(url, json=payload, headers=headers, timeout=90)
+                response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=90)
                 
                 if response.status_code == 200:
                     st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    st.success("¡Conexión establecida! Material generado con éxito.")
+                    st.success("¡Material generado con éxito!")
                 else:
-                    # Si vuelve a dar 404, el error detallado nos dirá si es por el nombre del modelo
-                    st.error(f"Error {response.status_color}: {response.text}")
-                    
+                    st.error(f"Error {response.status_code}: {response.text}")
             except Exception as e:
-                st.error(f"Error de red: {e}")
+                st.error(f"Error de conexión: {e}")
 
 if 'material_ia' in st.session_state:
     st.divider()
     docx_bytes = generar_docx_profesional(st.session_state['material_ia'], nombre_escuela, nombre_profe, tema_input, logo_file=logo_subido)
-    st.download_button("📥 Descargar Word", data=docx_bytes, file_name=f"ELE_{tema_input}.docx")
+    st.download_button("📥 Descargar Word Profesional", data=docx_bytes, file_name=f"ELE_{tema_input}.docx")
     st.markdown(st.session_state['material_ia'])
