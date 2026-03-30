@@ -91,33 +91,36 @@ with col2:
     tecs_val = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
     gram_val = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Subjuntivo", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
 
-# --- PROCESO DE GENERACIÓN ---
-if st.button("🚀 Generar Material Editorial"):
+# ... (Mantén las funciones de limpieza y generación de DOCX iguales al código anterior)
+
+if st.button("🚀 Generar Material Editorial (Adaptado a Polonia)"):
     if not api_key or not tema_input:
-        st.error("⚠️ Falta API Key o Tema.")
+        st.error("⚠️ Configuración incompleta.")
     else:
         try:
             genai.configure(api_key=api_key.strip())
+            # Usamos Flash por estabilidad, pero con instrucciones de experto
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
-            # Autodetección de modelos disponibles en tu cuenta Pro
-            modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            modelo_final = "models/gemini-1.5-flash" if "models/gemini-1.5-flash" in modelos else modelos[0]
-            
-            model = genai.GenerativeModel(modelo_final)
-            
-            prompt_p = (f"Actúa como autor de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                      f"Genera un texto de {ext_val} y {items_val} ejercicios por técnica: {', '.join(tecs_val)}. "
-                      f"Enfoque: {', '.join(gram_val)}. "
-                      f"ESTRICTO: En los ejercicios usa '_______'. NO escribas las respuestas en el ejercicio. "
-                      f"Crea una sección final '# SOLUCIONARIO' con todas las respuestas[cite: 739]. "
+            prompt_p = (f"Actúa como profesor experto de español para polacos en la escuela {nombre_escuela}. "
+                      f"Tema: {tema_input}, Nivel: {nivel_mcer}. "
+                      f"IMPORTANTE: Mis alumnos son POLACOS. "
+                      f"1. En la sección '# VOCABULARIO CLAVE', incluye la traducción de cada palabra al POLACO.\n"
+                      f"2. En el texto, explica brevemente (en español) las diferencias o similitudes con el polaco (ej. el uso de 'się').\n"
+                      f"3. Requisitos: Texto de {ext_val} y {items_val} ejercicios por técnica: {', '.join(tecs_val)}.\n"
+                      f"4. AÑADE una técnica extra: 'Traducción del polaco al español' con frases típicas del tema.\n"
+                      f"5. REGLAS DE FORMATO: Usa '_______' para los huecos. NO pongas respuestas en los ejercicios.\n"
+                      f"6. Crea una sección final '# SOLUCIONARIO'.\n"
                       f"Firma: {nombre_profe}.")
             
-            with st.spinner(f"Generando con {modelo_final}..."):
+            with st.spinner("Generando unidad adaptada para alumnos polacos..."):
                 response = model.generate_content(prompt_p)
                 st.session_state['material_ia'] = response.text
-                st.success("¡Material generado!")
+                st.success("¡Material generado con éxito!")
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error detectado: {e}")
+
+# ... (El resto del código de descarga se mantiene igual)
 
 if 'material_ia' in st.session_state:
     st.divider()
