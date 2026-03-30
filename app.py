@@ -38,8 +38,8 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
         if not l: continue
         
         # Detección de títulos para saltos de página
-        if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper() or "EJERCICIOS" in l.upper() or "TRADUCCIÓN" in l.upper() or "TŁUMACZENIE" in l.upper() or "TRANSLATION" in l.upper():
-            if "SOLUCIONARIO" in l.upper(): doc.add_page_break()
+        if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper() or "EJERCICIOS" in l.upper() or "TRADUCCIÓN" in l.upper() or "TŁUMACZENIE" in l.upper() or "TRANSLATION" in l.upper() or "KEY VOCABULARY" in l.upper() or "ANSWER KEY" in l.upper():
+            if "SOLUCIONARIO" in l.upper() or "ANSWER KEY" in l.upper(): doc.add_page_break()
             doc.add_heading(l.replace('#', '').strip(), level=1)
             continue
             
@@ -74,7 +74,6 @@ with st.sidebar:
     nombre_profe = st.text_input("Profesor/a", "Mario")
     api_key = st.text_input("API Key (Gemini)", type="password")
     st.divider()
-    # NUEVO: Selector de idioma
     idioma_alumnos = st.selectbox("🌍 Idioma de los alumnos", ["Inglés", "Polaco", "Ninguno (100% Español)"])
 
 # --- INTERFAZ ---
@@ -94,7 +93,7 @@ with col1:
 with col2:
     items_val = st.number_input("Items por técnica", 1, 30, 15)
     tecs_val = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
-    gram_val = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Subjuntivo", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
+    gram_val = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Subjuntivo", "Ser/Estar", "Por/Para", "Objetos Directos e Indirectos"], default=["Vocabulario", "Presente de Indicativo"])
 
 # --- GENERACIÓN AUTODETECTADA ---
 if st.button("🚀 Generar Material Editorial"):
@@ -114,38 +113,42 @@ if st.button("🚀 Generar Material Editorial"):
                 modelos_permitidos = [m["name"] for m in modelos_data if "generateContent" in m.get("supportedGenerationMethods", [])]
                 
                 modelo_elegido = ""
-                for preferido in ["models/gemini-2.5-flash", "models/gemini-1.5-pro", "models/gemini-1.5-flash", "models/gemini-pro"]:
+                for preferido in ["models/gemini-2.5-flash", "models/gemini-1.5-pro", "models/gemini-1.5-flash"]:
                     if preferido in modelos_permitidos:
                         modelo_elegido = preferido
                         break
-                
-                if not modelo_elegido:
-                    modelo_elegido = modelos_permitidos[0]
+                if not modelo_elegido: modelo_elegido = modelos_permitidos[0]
                 
                 st.info(f"✅ Conexión establecida a través de: {modelo_elegido}")
             
-            with st.spinner(f"Paso 2: Generando la unidad en {idioma_alumnos}..."):
+            with st.spinner(f"Paso 2: Redactando unidad inmersiva en {idioma_alumnos}..."):
                 url_gen = f"https://generativelanguage.googleapis.com/v1/{modelo_elegido}:generateContent?key={api_key.strip()}"
                 
-                # Adaptamos las instrucciones según el idioma elegido
+                # INSTRUCCIONES BILINGÜES EXTREMAS
                 if idioma_alumnos != "Ninguno (100% Español)":
-                    instrucciones_idioma = (f"INSTRUCCIONES BILINGÜES:\n"
-                                            f"1. En '# VOCABULARIO CLAVE', incluye la traducción al {idioma_alumnos.upper()} de cada palabra.\n"
-                                            f"2. Explica la gramática comparando el español con el {idioma_alumnos.upper()}.\n"
-                                            f"3. Añade una sección de 'Traducción {idioma_alumnos.upper()}-español'.\n")
+                    instrucciones_idioma = (
+                        f"REGLA DE ORO BILINGÜE: Tú eres un profesor que explica en {idioma_alumnos.upper()}.\n"
+                        f"Toda la teoría, las explicaciones gramaticales, las instrucciones de los ejercicios y los títulos de las secciones DEBEN ESTAR ESCRITOS EN {idioma_alumnos.upper()}.\n"
+                        f"Usa el español SOLAMENTE para:\n"
+                        f"- Las listas de vocabulario (formato: Español - {idioma_alumnos}).\n"
+                        f"- Los ejemplos gramaticales dentro de las explicaciones.\n"
+                        f"- El contenido de los ejercicios (las frases que el alumno debe resolver).\n"
+                        f"Incluye una sección dedicada a 'Traducción {idioma_alumnos.upper()}-Español' con frases del tema.\n"
+                    )
                 else:
-                    instrucciones_idioma = "INSTRUCCIONES: Todo el material debe ser 100% en español, sin ninguna traducción.\n"
+                    instrucciones_idioma = "INSTRUCCIONES: Todo el material, explicaciones, títulos y ejercicios deben ser 100% en español, sin ninguna traducción.\n"
 
                 prompt_p = (f"Actúa como profesor experto de español en la escuela {nombre_escuela}. "
                           f"Tema: {tema_input}, Nivel: {nivel_mcer}. "
                           f"{instrucciones_idioma}"
-                          f"4. Genera un texto de {ext_val} y {items_val} ejercicios por cada técnica: {', '.join(tecs_val)}.\n"
-                          f"5. REGLA ESTRICTA: Usa '_______' para huecos vacíos. NO escribas las respuestas en el ejercicio.\n"
-                          f"6. Incluye siempre '# SOLUCIONARIO' al final.\n"
+                          f"Genera un texto explicativo de {ext_val} y {items_val} ejercicios por cada técnica: {', '.join(tecs_val)}.\n"
+                          f"Enfoque gramatical: {', '.join(gram_val)}.\n"
+                          f"REGLA DE EJERCICIOS: Usa líneas largas '_______' para los huecos vacíos. NO escribas las respuestas dentro del ejercicio. "
+                          f"Crea una sección final '# SOLUCIONARIO' (o su traducción) con todas las respuestas.\n"
                           f"Firma: {nombre_profe}.")
                 
                 payload = {"contents": [{"parts": [{"text": prompt_p}]}]}
-                res_gen = requests.post(url_gen, json=payload, timeout=180)
+                res_gen = requests.post(url_gen, json=payload, timeout=200) # Aumentado el timeout para bilingüismo complejo
                 
                 if res_gen.status_code == 200:
                     st.session_state['material_ia'] = res_gen.json()["candidates"][0]["content"]["parts"][0]["text"]
@@ -159,5 +162,5 @@ if st.button("🚀 Generar Material Editorial"):
 if 'material_ia' in st.session_state:
     st.divider()
     docx_bytes = generar_docx_profesional(st.session_state['material_ia'], nombre_escuela, nombre_profe, tema_input, logo_file=logo_subido)
-    st.download_button("📥 Descargar Word Profesional", data=docx_bytes, file_name=f"ELE_{tema_input}.docx")
+    st.download_button(f"📥 Descargar Word ({idioma_alumnos})", data=docx_bytes, file_name=f"ELE_{tema_input}.docx")
     st.markdown(st.session_state['material_ia'])
