@@ -72,33 +72,35 @@ with col1:
 with col2:
     tec = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas"])
 
-if st.button("🚀 Generar Material"):
+if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
-        st.error("⚠️ Falta la clave API o el Tema.")
+        st.error("⚠️ Configuración incompleta (Falta API Key o Tema).")
     else:
-        # URL CORREGIDA A VERSIÓN ESTABLE v1
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key.strip()}"
+        # URL CON EL MODELO EXACTO: gemini-1.5-pro
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key.strip()}"
         
-        prompt = (f"Actúa como autor de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                  f"Sección '# VOCABULARIO CLAVE'. Crea {items} ejercicios por técnica: {', '.join(tec)}. "
-                  f"Incluye '# SOLUCIONARIO'. Firma: {nombre_profe}.")
+        prompt = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
+                  f"Requisitos: Sección '# VOCABULARIO CLAVE', texto extenso de 3 páginas (2000 palabras), "
+                  f"y {items} ejercicios por técnica: {', '.join(tec)}. "
+                  f"Incluye siempre '# SOLUCIONARIO' al final. Firma: {nombre_profe}.")
         
-        with st.spinner("Conectando con la central de Google..."):
+        with st.spinner("Redactando unidad de alta calidad..."):
             try:
-                response = requests.post(
-                    url, 
-                    json={"contents": [{"parts": [{"text": prompt}]}]}, 
-                    timeout=30
-                )
+                # Añadimos un pequeño encabezado de tipo de contenido para asegurar la comunicación
+                headers = {'Content-Type': 'application/json'}
+                payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                
+                response = requests.post(url, json=payload, headers=headers, timeout=60)
                 
                 if response.status_code == 200:
                     st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    st.success("¡Conexión exitosa y material generado!")
+                    st.success("¡Material generado con éxito!")
                 else:
+                    # Si falla, nos mostrará el mensaje detallado de Google
                     st.error(f"Error {response.status_code}: {response.text}")
                     
             except Exception as e:
-                st.error(f"No se pudo conectar: {e}")
+                st.error(f"Error de conexión: {e}")
 
 if 'material_ia' in st.session_state:
     st.divider()
