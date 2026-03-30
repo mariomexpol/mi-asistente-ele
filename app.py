@@ -7,17 +7,17 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
 
+# --- FUNCIÓN DE LIMPIEZA ---
 def limpiar_texto_ele(texto):
-    # Elimina caracteres de escape que ensucian los ejercicios 
     return texto.replace('\\_', '_').replace('\\', '')
 
+# --- GENERADOR DOCX ---
 def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     doc = Document()
     section = doc.sections[0]
     header = section.header
     htxt = header.paragraphs[0]
     
-    # Manejo del Logo Institucional 
     if logo_file:
         try:
             run_logo = htxt.add_run()
@@ -28,7 +28,6 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     info_h = header.add_paragraph(f"{escuela}\nProf. {profe}")
     info_h.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-    # Título Principal 
     doc.add_paragraph() 
     titulo = doc.add_heading(tema.upper(), 0)
     titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -37,14 +36,10 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     for linea in lineas:
         l = linea.strip()
         if not l: continue
-            
-        # Detección de Secciones y Solucionario 
         if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper():
             if "SOLUCIONARIO" in l.upper(): doc.add_page_break()
             doc.add_heading(l.replace('#', '').strip(), level=1)
             continue
-            
-        # Creación de Tablas de Relacionar Columnas 
         if '|' in l and '---' not in l:
             datos = [c.strip() for c in l.split('|') if c.strip()]
             if len(datos) >= 2:
@@ -54,7 +49,6 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
                 cells[0].text = datos[0]
                 cells[1].text = datos[1]
                 continue
-
         p = doc.add_paragraph()
         partes = l.split('**')
         for i, parte in enumerate(partes):
@@ -70,14 +64,14 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
 # --- BARRA LATERAL ---
 with st.sidebar:
     st.header("🏫 Configuración")
-    logo_subido = st.file_uploader("Subir logo de la escuela", type=["png", "jpg", "jpeg"])
+    logo_subido = st.file_uploader("Subir logo", type=["png", "jpg", "jpeg"])
     nombre_escuela = st.text_input("Escuela", "El Sabor de la Lengua")
     nombre_profe = st.text_input("Profesor/a", "Mario")
     api_key = st.text_input("API Key (Gemini)", type="password")
 
 # --- INTERFAZ ---
 st.title("🎓 Generador ELE Pro")
-modo = st.selectbox("Selecciona modo", ["Unidad Completa (Texto + Ejercicios)", "Solo Lista de Ejercicios"])
+modo = st.selectbox("Modo", ["Unidad Completa (Texto + Ejercicios)", "Solo Lista de Ejercicios"])
 
 st.divider()
 
@@ -85,49 +79,45 @@ col1, col2 = st.columns(2)
 with col1:
     tema_input = st.text_input("Tema de la unidad")
     nivel_mcer = st.selectbox("Nivel", ["A1", "A2", "B1", "B2", "C1", "C2"])
+    ext = "Corto"
     if modo == "Unidad Completa (Texto + Ejercicios)":
         ext = st.select_slider("Extensión", ["Corto", "1 pág", "2 págs", "3 págs (Extenso)"], "3 págs (Extenso)")
 
 with col2:
     items = st.number_input("Items por técnica", 1, 30, 15)
-    tecs = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
-    gram = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Presente de Subjuntivo", "Pretérito Imperfecto de Subjuntivo", "Condicional Simple", "Condicional Compuesto", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
+    tecnicas_sel = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
+    gram_sel = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Presente de Subjuntivo", "Pretérito Imperfecto de Subjuntivo", "Condicional Simple", "Condicional Compuesto", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
 
+# --- GENERACIÓN ---
 if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
-        st.error("⚠️ Configuración incompleta (Falta API Key o Tema).")
+        st.error("⚠️ Configuración incompleta.")
     else:
-        # URL DEFINITIVA PARA CUENTAS PRO: v1beta con gemini-1.5-pro
-        # Esta combinación es la más potente y compatible para textos de 3 páginas
+        # URL OPTIMIZADA PARA CUENTAS PRO
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key.strip()}"
         
-        prompt = (f"Actúa como autor experto de la escuela {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                  f"Requisitos: Sección '# VOCABULARIO CLAVE', texto muy extenso de 3 páginas (mínimo 2000 palabras), "
-                  f"y {items} ejercicios por técnica: {', '.join(tec)}. "
-                  f"Enfoque gramatical: {', '.join(gram)}. "
-                  f"IMPORTANTE: Incluye siempre '# SOLUCIONARIO' al final en una página nueva. "
-                  f"Tablas de relacionar: 'Concepto | Definición'. Firma: {nombre_profe}.")
+        detalles = f"Texto de {ext} (2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
         
-        with st.spinner("Accediendo a la potencia de Gemini 1.5 Pro..."):
+        prompt = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
+                  f"Requisitos: {detalles}. Sección '# VOCABULARIO CLAVE'. "
+                  f"Crea {items} ejercicios por técnica: {', '.join(tecnicas_sel)}. "
+                  f"Enfoque gramatical: {', '.join(gram_sel)}. "
+                  f"IMPORTANTE: Al final, incluye siempre '# SOLUCIONARIO' con todas las respuestas. "
+                  f"Firma: {nombre_profe}.")
+        
+        with st.spinner("Generando contenido con Gemini 1.5 Pro..."):
             try:
-                headers = {'Content-Type': 'application/json'}
-                payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                
-                # Aumentamos el tiempo de espera a 240 segundos (4 minutos) 
-                # debido a que el modelo Pro genera mucho más detalle.
-                response = requests.post(url, json=payload, headers=headers, timeout=240)
-                
+                response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=240)
                 if response.status_code == 200:
                     st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    st.success("¡Conexión Pro exitosa! Unidad generada.")
+                    st.success("¡Material generado con éxito!")
                 else:
-                    # Si falla, el error nos dirá exactamente qué falta
                     st.error(f"Error {response.status_code}: {response.text}")
-                    
             except Exception as e:
                 st.error(f"Error de conexión: {e}")
+
 if 'material_ia' in st.session_state:
     st.divider()
     docx_bytes = generar_docx_profesional(st.session_state['material_ia'], nombre_escuela, nombre_profe, tema_input, logo_file=logo_subido)
-    st.download_button("📥 Descargar Word con Logo y Soluciones", data=docx_bytes, file_name=f"ELE_{tema_input}.docx")
+    st.download_button("📥 Descargar Word Profesional", data=docx_bytes, file_name=f"ELE_{tema_input}.docx")
     st.markdown(st.session_state['material_ia'])
