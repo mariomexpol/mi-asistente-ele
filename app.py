@@ -7,11 +7,9 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
 
-# --- FUNCIÓN DE LIMPIEZA ---
 def limpiar_texto_ele(texto):
     return texto.replace('\\_', '_').replace('\\', '')
 
-# --- GENERADOR DOCX ---
 def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     doc = Document()
     section = doc.sections[0]
@@ -36,10 +34,14 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     for linea in lineas:
         l = linea.strip()
         if not l: continue
-        if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper():
+        
+        # Títulos y Salto de página para el Solucionario
+        if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper() or "EJERCICIOS" in l.upper():
             if "SOLUCIONARIO" in l.upper(): doc.add_page_break()
             doc.add_heading(l.replace('#', '').strip(), level=1)
             continue
+            
+        # Tablas de Relacionar (formato A | B)
         if '|' in l and '---' not in l:
             datos = [c.strip() for c in l.split('|') if c.strip()]
             if len(datos) >= 2:
@@ -49,6 +51,7 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
                 cells[0].text = datos[0]
                 cells[1].text = datos[1]
                 continue
+
         p = doc.add_paragraph()
         partes = l.split('**')
         for i, parte in enumerate(partes):
@@ -88,42 +91,32 @@ with col2:
     tecs_val = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
     gram_val = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Presente de Subjuntivo", "Pretérito Imperfecto de Subjuntivo", "Condicional Simple", "Condicional Compuesto", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
 
-# --- GENERACIÓN CON AUTO-DETECCIÓN ---
+# --- GENERACIÓN ---
 if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
         st.error("⚠️ Configuración incompleta.")
     else:
         try:
             genai.configure(api_key=api_key.strip())
-            
-            # Buscamos qué modelos tienes permitidos para evitar el 404
-            modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            
-            # Prioridad de modelos: Pro > Flash > Text-Bison
-            modelo_final = ""
-            if any("gemini-1.5-pro" in m for m in modelos_disponibles):
-                modelo_final = "gemini-1.5-pro"
-            elif any("gemini-1.5-flash" in m for m in modelos_disponibles):
-                modelo_final = "gemini-1.5-flash"
-            else:
-                modelo_final = modelos_disponibles[0] # El primero que encuentre
-            
-            model = genai.GenerativeModel(modelo_final)
+            model = genai.GenerativeModel('gemini-1.5-pro') # Tu modelo de 2TB
             
             detalles_p = f"Texto de {ext_val} (2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
             
+            # PROMPT MEJORADO PARA FORMATO DE EJERCICIOS
             prompt_p = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
                       f"Requisitos: {detalles_p}. Sección '# VOCABULARIO CLAVE'. "
-                      f"Crea {items_val} ejercicios por técnica: {', '.join(tecs_val)}. "
-                      f"Enfoque gramatical: {', '.join(gram_val)}. "
-                      f"IMPORTANTE: Al final, incluye siempre una sección llamada '# SOLUCIONARIO' con todas las respuestas. "
+                      f"Crea {items_val} ejercicios por técnica: {', '.join(tecs_val)}. Enfoque gramatical: {', '.join(gram_val)}. "
+                      f"REGLAS DE FORMATO CRÍTICAS:\n"
+                      f"1. En 'Test de Cloze', usa siempre líneas largas '_______' para los huecos. NO pongas la respuesta ahí.\n"
+                      f"2. En 'Relacionar columnas', presenta una tabla 'A | B' con los conceptos desordenados.\n"
+                      f"3. En 'Verdadero o Falso', deja el espacio ( ) vacío.\n"
+                      f"4. Al final del documento, crea una sección '# SOLUCIONARIO' donde incluyas todas las respuestas correctas de forma numerada.\n"
                       f"Firma: {nombre_profe}.")
             
-            with st.spinner(f"Usando modelo detectado: {modelo_final}..."):
+            with st.spinner("Redactando material y limpiando ejercicios..."):
                 response = model.generate_content(prompt_p)
                 st.session_state['material_ia'] = response.text
-                st.success(f"¡Material generado con {modelo_final}!")
-                
+                st.success("¡Material generado con éxito!")
         except Exception as e:
             st.error(f"Error detectado: {e}")
 
