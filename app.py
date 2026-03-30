@@ -76,23 +76,29 @@ if st.button("🚀 Generar Material"):
     if not api_key or not tema_input:
         st.error("⚠️ Falta la clave API o el Tema.")
     else:
-        # URL ACTUALIZADA Y ESTABLE
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
+        # URL CORREGIDA A VERSIÓN ESTABLE v1
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key.strip()}"
         
-        prompt = f"Actúa como autor de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. Crea {items} ejercicios por técnica: {', '.join(tec)}. Incluye '# SOLUCIONARIO'. Firma: {nombre_profe}."
+        prompt = (f"Actúa como autor de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
+                  f"Sección '# VOCABULARIO CLAVE'. Crea {items} ejercicios por técnica: {', '.join(tec)}. "
+                  f"Incluye '# SOLUCIONARIO'. Firma: {nombre_profe}.")
         
-        with st.spinner("Conectando con Google AI..."):
+        with st.spinner("Conectando con la central de Google..."):
             try:
-                response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
-                # Esta línea es la clave: nos dirá el error real si falla
-                response.raise_for_status() 
+                response = requests.post(
+                    url, 
+                    json={"contents": [{"parts": [{"text": prompt}]}]}, 
+                    timeout=30
+                )
                 
-                st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                st.success("¡Generado!")
-            except requests.exceptions.HTTPError as err:
-                st.error(f"Error de Google: {err.response.status_code} - {err.response.text}")
+                if response.status_code == 200:
+                    st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    st.success("¡Conexión exitosa y material generado!")
+                else:
+                    st.error(f"Error {response.status_code}: {response.text}")
+                    
             except Exception as e:
-                st.error(f"Error inesperado: {e}")
+                st.error(f"No se pudo conectar: {e}")
 
 if 'material_ia' in st.session_state:
     st.divider()
