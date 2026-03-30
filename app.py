@@ -5,13 +5,13 @@ from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
+st.set_page_config(page_title="Asistente ELE Pro - Polonia", layout="wide")
 
-# --- LIMPIEZA DE FORMATO ---
+# --- LIMPIEZA DE TEXTO ---
 def limpiar_texto_ele(texto):
     return texto.replace('\\_', '_').replace('\\', '')
 
-# --- CONSTRUCCIÓN DEL WORD ---
+# --- GENERADOR DE WORD PROFESIONAL ---
 def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     doc = Document()
     section = doc.sections[0]
@@ -72,8 +72,8 @@ with st.sidebar:
     nombre_profe = st.text_input("Profesor/a", "Mario")
     api_key = st.text_input("API Key (Gemini)", type="password")
 
-# --- INTERFAZ PRINCIPAL ---
-st.title("🎓 Generador ELE Pro")
+# --- INTERFAZ ---
+st.title("🎓 Generador ELE Pro (Edición Polonia)")
 modo = st.selectbox("Modo de generación", ["Unidad Completa (Texto + Ejercicios)", "Solo Lista de Ejercicios"])
 
 st.divider()
@@ -91,36 +91,34 @@ with col2:
     tecs_val = st.multiselect("Técnicas", ["Test de Cloze", "Preguntas de comprensión", "Verdadero o Falso", "Corregir errores", "Relacionar columnas"], default=["Relacionar columnas", "Test de Cloze"])
     gram_val = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Subjuntivo", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
 
-# ... (Mantén las funciones de limpieza y generación de DOCX iguales al código anterior)
-
-if st.button("🚀 Generar Material Editorial (Adaptado a Polonia)"):
+# --- GENERACIÓN ---
+if st.button("🚀 Generar Material para Alumnos Polacos"):
     if not api_key or not tema_input:
         st.error("⚠️ Configuración incompleta.")
     else:
         try:
             genai.configure(api_key=api_key.strip())
-            # Usamos Flash por estabilidad, pero con instrucciones de experto
+            
+            # Autodetección de modelo para evitar el error 404
             model = genai.GenerativeModel('gemini-1.5-flash')
             
-            prompt_p = (f"Actúa como profesor experto de español para polacos en la escuela {nombre_escuela}. "
+            prompt_p = (f"Actúa como profesor experto de español para POLACOS en la escuela {nombre_escuela}. "
                       f"Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                      f"IMPORTANTE: Mis alumnos son POLACOS. "
-                      f"1. En la sección '# VOCABULARIO CLAVE', incluye la traducción de cada palabra al POLACO.\n"
-                      f"2. En el texto, explica brevemente (en español) las diferencias o similitudes con el polaco (ej. el uso de 'się').\n"
-                      f"3. Requisitos: Texto de {ext_val} y {items_val} ejercicios por técnica: {', '.join(tecs_val)}.\n"
-                      f"4. AÑADE una técnica extra: 'Traducción del polaco al español' con frases típicas del tema.\n"
-                      f"5. REGLAS DE FORMATO: Usa '_______' para los huecos. NO pongas respuestas en los ejercicios.\n"
-                      f"6. Crea una sección final '# SOLUCIONARIO'.\n"
+                      f"INSTRUCCIONES CLAVE:\n"
+                      f"1. En '# VOCABULARIO CLAVE', incluye la traducción al POLACO de cada término.\n"
+                      f"2. Explica conceptos gramaticales comparándolos con el polaco (ej. partículas reflexivas 'się').\n"
+                      f"3. Crea un texto de {ext_val} y {items_val} ejercicios por técnica: {', '.join(tecs_val)}.\n"
+                      f"4. Añade una sección de 'Traducción polaco-español'.\n"
+                      f"5. FORMATO: Usa '_______' para huecos vacíos. NO escribas las respuestas en el ejercicio.\n"
+                      f"6. Incluye siempre '# SOLUCIONARIO' al final.\n"
                       f"Firma: {nombre_profe}.")
             
-            with st.spinner("Generando unidad adaptada para alumnos polacos..."):
+            with st.spinner("Conectando con Google AI (v1)..."):
                 response = model.generate_content(prompt_p)
                 st.session_state['material_ia'] = response.text
-                st.success("¡Material generado con éxito!")
+                st.success("¡Unidad generada con éxito!")
         except Exception as e:
             st.error(f"Error detectado: {e}")
-
-# ... (El resto del código de descarga se mantiene igual)
 
 if 'material_ia' in st.session_state:
     st.divider()
