@@ -97,8 +97,8 @@ if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
         st.error("⚠️ Configuración incompleta.")
     else:
-        # URL CORREGIDA A v1 (Producción Estable)
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
+        # URL UNIVERSAL: gemini-pro es el alias más compatible en v1
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key.strip()}"
         
         detalles = f"Texto de {ext} (2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
         
@@ -108,18 +108,19 @@ if st.button("🚀 Generar Material Editorial"):
                   f"IMPORTANTE: Al final, incluye siempre una sección llamada '# SOLUCIONARIO' con todas las respuestas. "
                   f"Tablas: 'A | B'. Firma: {nombre_profe}.")
         
-        with st.spinner("Conectando con Google AI (Ruta v1)..."):
+        with st.spinner("Conectando con la base de datos de Google..."):
             try:
+                # Usamos el modelo gemini-pro que es el estándar de oro para v1
                 response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=120)
                 
                 if response.status_code == 200:
                     st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    st.success("¡Material generado con éxito!")
+                    st.success("¡Conexión establecida con éxito!")
                 else:
+                    # Si esto falla, el error nos dirá exactamente qué modelos SI están permitidos
                     st.error(f"Error {response.status_code}: {response.text}")
             except Exception as e:
                 st.error(f"Error de red: {e}")
-
 if 'material_ia' in st.session_state:
     st.divider()
     docx_bytes = generar_docx_profesional(st.session_state['material_ia'], nombre_escuela, nombre_profe, tema_input, logo_file=logo_subido)
