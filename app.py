@@ -5,7 +5,7 @@ from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-st.set_page_config(page_title="Asistente ELE Pro - Polonia", layout="wide")
+st.set_page_config(page_title="Asistente ELE Pro - El Sabor de la Lengua", layout="wide")
 
 # --- LIMPIEZA DE TEXTO ---
 def limpiar_texto_ele(texto):
@@ -37,11 +37,13 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
         l = linea.strip()
         if not l: continue
         
+        # Títulos y Salto de página para el Solucionario
         if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper() or "EJERCICIOS" in l.upper():
             if "SOLUCIONARIO" in l.upper(): doc.add_page_break()
             doc.add_heading(l.replace('#', '').strip(), level=1)
             continue
             
+        # Formato de Tablas
         if '|' in l and '---' not in l:
             datos = [c.strip() for l_p in l.split('|') if (c := l_p.strip())]
             if len(datos) >= 2:
@@ -64,16 +66,16 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
     doc.save(bio)
     return bio.getvalue()
 
-# --- BARRA LATERAL ---
+# --- BARRA LATERAL (CONFIGURACIÓN) ---
 with st.sidebar:
     st.header("🏫 Configuración")
-    logo_subido = st.file_uploader("Subir logo", type=["png", "jpg", "jpeg"])
+    logo_subido = st.file_uploader("Logo de la escuela", type=["png", "jpg", "jpeg"])
     nombre_escuela = st.text_input("Escuela", "El Sabor de la Lengua")
     nombre_profe = st.text_input("Profesor/a", "Mario")
     api_key = st.text_input("API Key (Gemini)", type="password")
 
 # --- INTERFAZ ---
-st.title("🎓 Generador ELE Pro (Edición Polonia)")
+st.title("🎓 Generador ELE Pro (Especial Polonia)")
 modo = st.selectbox("Modo de generación", ["Unidad Completa (Texto + Ejercicios)", "Solo Lista de Ejercicios"])
 
 st.divider()
@@ -98,25 +100,23 @@ if st.button("🚀 Generar Material para Alumnos Polacos"):
     else:
         try:
             genai.configure(api_key=api_key.strip())
-            
-            # Autodetección de modelo para evitar el error 404
             model = genai.GenerativeModel('gemini-1.5-flash')
             
-            prompt_p = (f"Actúa como profesor experto de español para POLACOS en la escuela {nombre_escuela}. "
+            prompt_p = (f"Actúa como profesor experto de español para alumnos POLACOS en la escuela {nombre_escuela}. "
                       f"Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                      f"INSTRUCCIONES CLAVE:\n"
-                      f"1. En '# VOCABULARIO CLAVE', incluye la traducción al POLACO de cada término.\n"
-                      f"2. Explica conceptos gramaticales comparándolos con el polaco (ej. partículas reflexivas 'się').\n"
-                      f"3. Crea un texto de {ext_val} y {items_val} ejercicios por técnica: {', '.join(tecs_val)}.\n"
-                      f"4. Añade una sección de 'Traducción polaco-español'.\n"
-                      f"5. FORMATO: Usa '_______' para huecos vacíos. NO escribas las respuestas en el ejercicio.\n"
-                      f"6. Incluye siempre '# SOLUCIONARIO' al final.\n"
+                      f"INSTRUCCIONES PARA POLONIA:\n"
+                      f"1. En '# VOCABULARIO CLAVE', incluye la traducción al POLACO de cada palabra.\n"
+                      f"2. En las explicaciones gramaticales, haz comparaciones con el polaco (ej. partículas reflexivas 'się' frente a 'me, te, se').\n"
+                      f"3. Genera un texto de {ext_val} y {items_val} ejercicios por cada técnica: {', '.join(tecs_val)}.\n"
+                      f"4. Añade una técnica de 'Traducción polaco-español' (Tłumaczenie).\n"
+                      f"5. REGLA ESTRICTA: Usa '_______' para los huecos vacíos. NO escribas las respuestas en el ejercicio.\n"
+                      f"6. Incluye siempre '# SOLUCIONARIO' al final en una página nueva.\n"
                       f"Firma: {nombre_profe}.")
             
-            with st.spinner("Conectando con Google AI (v1)..."):
+            with st.spinner("Redactando unidad bilingüe para tus alumnos..."):
                 response = model.generate_content(prompt_p)
                 st.session_state['material_ia'] = response.text
-                st.success("¡Unidad generada con éxito!")
+                st.success("¡Material generado con éxito!")
         except Exception as e:
             st.error(f"Error detectado: {e}")
 
