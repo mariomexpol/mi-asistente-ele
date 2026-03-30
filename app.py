@@ -97,10 +97,10 @@ if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
         st.error("⚠️ Configuración incompleta.")
     else:
-        # URL UNIVERSAL: gemini-pro es el alias más compatible en v1
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key.strip()}"
+        # URL CERTIFICADA PARA 2026: v1 con gemini-1.5-flash-latest
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key={api_key.strip()}"
         
-        detalles = f"Texto de {ext} (2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
+        detalles = f"Texto de {ext} (mínimo 2000 palabras si es extenso)." if modo == "Unidad Completa (Texto + Ejercicios)" else "Genera solo los ejercicios."
         
         prompt = (f"Actúa como autor experto de {nombre_escuela}. Tema: {tema_input}, Nivel: {nivel_mcer}. "
                   f"Requisitos: {detalles}. Sección '# VOCABULARIO CLAVE'. "
@@ -108,16 +108,21 @@ if st.button("🚀 Generar Material Editorial"):
                   f"IMPORTANTE: Al final, incluye siempre una sección llamada '# SOLUCIONARIO' con todas las respuestas. "
                   f"Tablas: 'A | B'. Firma: {nombre_profe}.")
         
-        with st.spinner("Conectando con la base de datos de Google..."):
+        with st.spinner("Conectando con los servidores de Google..."):
             try:
-                # Usamos el modelo gemini-pro que es el estándar de oro para v1
-                response = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=120)
+                # Usamos el modelo flash-latest que es el más estable para v1
+                response = requests.post(
+                    url, 
+                    json={"contents": [{"parts": [{"text": prompt}]}]}, 
+                    headers={'Content-Type': 'application/json'},
+                    timeout=120
+                )
                 
                 if response.status_code == 200:
                     st.session_state['material_ia'] = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    st.success("¡Conexión establecida con éxito!")
+                    st.success("¡Conexión establecida! Material generado.")
                 else:
-                    # Si esto falla, el error nos dirá exactamente qué modelos SI están permitidos
+                    # Este mensaje nos dirá si hay un problema de cuota o de región
                     st.error(f"Error {response.status_code}: {response.text}")
             except Exception as e:
                 st.error(f"Error de red: {e}")
