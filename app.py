@@ -5,7 +5,7 @@ from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-st.set_page_config(page_title="Asistente ELE Pro - Polonia", layout="wide")
+st.set_page_config(page_title="Asistente ELE Pro", layout="wide")
 
 # --- LIMPIEZA DE TEXTO ---
 def limpiar_texto_ele(texto):
@@ -37,11 +37,13 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
         l = linea.strip()
         if not l: continue
         
-        if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper() or "EJERCICIOS" in l.upper() or "TŁUMACZENIE" in l.upper():
+        # Detección de títulos para saltos de página
+        if l.startswith('#') or "VOCABULARIO" in l.upper() or "SOLUCIONARIO" in l.upper() or "EJERCICIOS" in l.upper() or "TRADUCCIÓN" in l.upper() or "TŁUMACZENIE" in l.upper() or "TRANSLATION" in l.upper():
             if "SOLUCIONARIO" in l.upper(): doc.add_page_break()
             doc.add_heading(l.replace('#', '').strip(), level=1)
             continue
             
+        # Formato de Tablas
         if '|' in l and '---' not in l:
             datos = [c.strip() for l_p in l.split('|') if (c := l_p.strip())]
             if len(datos) >= 2:
@@ -71,9 +73,12 @@ with st.sidebar:
     nombre_escuela = st.text_input("Escuela", "El Sabor de la Lengua")
     nombre_profe = st.text_input("Profesor/a", "Mario")
     api_key = st.text_input("API Key (Gemini)", type="password")
+    st.divider()
+    # NUEVO: Selector de idioma
+    idioma_alumnos = st.selectbox("🌍 Idioma de los alumnos", ["Inglés", "Polaco", "Ninguno (100% Español)"])
 
 # --- INTERFAZ ---
-st.title("🎓 Generador ELE Pro (Edición Polonia)")
+st.title("🎓 Generador ELE Pro")
 modo = st.selectbox("Modo de generación", ["Unidad Completa (Texto + Ejercicios)", "Solo Lista de Ejercicios"])
 
 st.divider()
@@ -92,13 +97,12 @@ with col2:
     gram_val = st.multiselect("Enfoque", ["Vocabulario", "Presente de Indicativo", "Pretéritos", "Futuros", "Subjuntivo", "Ser/Estar", "Por/Para"], default=["Vocabulario", "Presente de Indicativo"])
 
 # --- GENERACIÓN AUTODETECTADA ---
-if st.button("🚀 Generar Material para Alumnos Polacos"):
+if st.button("🚀 Generar Material Editorial"):
     if not api_key or not tema_input:
         st.error("⚠️ Configuración incompleta.")
     else:
         try:
             with st.spinner("Paso 1: Detectando modelos autorizados para tu cuenta Pro..."):
-                # PASO 1: Preguntamos a Google qué modelos existen en v1 para ti
                 url_models = f"https://generativelanguage.googleapis.com/v1/models?key={api_key.strip()}"
                 res_models = requests.get(url_models, timeout=20)
                 
@@ -109,29 +113,33 @@ if st.button("🚀 Generar Material para Alumnos Polacos"):
                 modelos_data = res_models.json().get("models", [])
                 modelos_permitidos = [m["name"] for m in modelos_data if "generateContent" in m.get("supportedGenerationMethods", [])]
                 
-                # Elegimos el mejor modelo disponible (Pro > Flash > El que haya)
                 modelo_elegido = ""
-                for preferido in ["models/gemini-1.5-pro", "models/gemini-1.5-flash", "models/gemini-pro"]:
+                for preferido in ["models/gemini-2.5-flash", "models/gemini-1.5-pro", "models/gemini-1.5-flash", "models/gemini-pro"]:
                     if preferido in modelos_permitidos:
                         modelo_elegido = preferido
                         break
                 
                 if not modelo_elegido:
-                    modelo_elegido = modelos_permitidos[0] # Usa el primero que Google devuelva
+                    modelo_elegido = modelos_permitidos[0]
                 
                 st.info(f"✅ Conexión establecida a través de: {modelo_elegido}")
             
-            with st.spinner("Paso 2: Generando la unidad bilingüe..."):
-                # PASO 2: Generamos el contenido forzando la ruta v1
+            with st.spinner(f"Paso 2: Generando la unidad en {idioma_alumnos}..."):
                 url_gen = f"https://generativelanguage.googleapis.com/v1/{modelo_elegido}:generateContent?key={api_key.strip()}"
                 
-                prompt_p = (f"Actúa como profesor experto de español para alumnos POLACOS en la escuela {nombre_escuela}. "
+                # Adaptamos las instrucciones según el idioma elegido
+                if idioma_alumnos != "Ninguno (100% Español)":
+                    instrucciones_idioma = (f"INSTRUCCIONES BILINGÜES:\n"
+                                            f"1. En '# VOCABULARIO CLAVE', incluye la traducción al {idioma_alumnos.upper()} de cada palabra.\n"
+                                            f"2. Explica la gramática comparando el español con el {idioma_alumnos.upper()}.\n"
+                                            f"3. Añade una sección de 'Traducción {idioma_alumnos.upper()}-español'.\n")
+                else:
+                    instrucciones_idioma = "INSTRUCCIONES: Todo el material debe ser 100% en español, sin ninguna traducción.\n"
+
+                prompt_p = (f"Actúa como profesor experto de español en la escuela {nombre_escuela}. "
                           f"Tema: {tema_input}, Nivel: {nivel_mcer}. "
-                          f"INSTRUCCIONES PARA POLONIA:\n"
-                          f"1. En '# VOCABULARIO CLAVE', incluye la traducción al POLACO de cada palabra.\n"
-                          f"2. Explica gramática comparando con el polaco (ej. partículas reflexivas 'się').\n"
-                          f"3. Genera un texto de {ext_val} y {items_val} ejercicios por cada técnica: {', '.join(tecs_val)}.\n"
-                          f"4. Añade una sección '# TŁUMACZENIE' (Traducción polaco-español).\n"
+                          f"{instrucciones_idioma}"
+                          f"4. Genera un texto de {ext_val} y {items_val} ejercicios por cada técnica: {', '.join(tecs_val)}.\n"
                           f"5. REGLA ESTRICTA: Usa '_______' para huecos vacíos. NO escribas las respuestas en el ejercicio.\n"
                           f"6. Incluye siempre '# SOLUCIONARIO' al final.\n"
                           f"Firma: {nombre_profe}.")
