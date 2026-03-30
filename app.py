@@ -43,7 +43,7 @@ def generar_docx_profesional(texto_ia, escuela, profe, tema, logo_file=None):
             doc.add_heading(l.replace('#', '').strip(), level=1)
             continue
             
-        # Formato de Tablas
+        # Formato de Tablas (A | B)
         if '|' in l and '---' not in l:
             datos = [c.strip() for l_p in l.split('|') if (c := l_p.strip())]
             if len(datos) >= 2:
@@ -74,7 +74,7 @@ with st.sidebar:
     nombre_profe = st.text_input("Profesor/a", "Mario")
     api_key = st.text_input("API Key (Gemini)", type="password")
 
-# --- INTERFAZ ---
+# --- INTERFAZ PRINCIPAL ---
 st.title("🎓 Generador ELE Pro (Especial Polonia)")
 modo = st.selectbox("Modo de generación", ["Unidad Completa (Texto + Ejercicios)", "Solo Lista de Ejercicios"])
 
@@ -100,20 +100,21 @@ if st.button("🚀 Generar Material para Alumnos Polacos"):
     else:
         try:
             genai.configure(api_key=api_key.strip())
+            # Usamos el modelo sin prefijos de versión para que la librería elija la mejor ruta estable
             model = genai.GenerativeModel('gemini-1.5-flash')
             
             prompt_p = (f"Actúa como profesor experto de español para alumnos POLACOS en la escuela {nombre_escuela}. "
                       f"Tema: {tema_input}, Nivel: {nivel_mcer}. "
                       f"INSTRUCCIONES PARA POLONIA:\n"
                       f"1. En '# VOCABULARIO CLAVE', incluye la traducción al POLACO de cada palabra.\n"
-                      f"2. En las explicaciones gramaticales, haz comparaciones con el polaco (ej. partículas reflexivas 'się' frente a 'me, te, se').\n"
-                      f"3. Genera un texto de {ext_val} y {items_val} ejercicios por cada técnica: {', '.join(tecs_val)}.\n"
-                      f"4. Añade una técnica de 'Traducción polaco-español' (Tłumaczenie).\n"
-                      f"5. REGLA ESTRICTA: Usa '_______' para los huecos vacíos. NO escribas las respuestas en el ejercicio.\n"
-                      f"6. Incluye siempre '# SOLUCIONARIO' al final en una página nueva.\n"
+                      f"2. Explica gramática comparando con el polaco (ej. partículas reflexivas 'się' vs 'me, te, se').\n"
+                      f"3. Genera texto de {ext_val} y {items_val} ejercicios por técnica: {', '.join(tecs_val)}.\n"
+                      f"4. Añade una sección de 'Traducción polaco-español' (Tłumaczenie).\n"
+                      f"5. REGLA ESTRICTA: Usa '_______' para huecos vacíos. NO escribas las respuestas en el ejercicio.\n"
+                      f"6. Incluye siempre '# SOLUCIONARIO' al final.\n"
                       f"Firma: {nombre_profe}.")
             
-            with st.spinner("Redactando unidad bilingüe para tus alumnos..."):
+            with st.spinner("Generando unidad bilingüe para tus alumnos..."):
                 response = model.generate_content(prompt_p)
                 st.session_state['material_ia'] = response.text
                 st.success("¡Material generado con éxito!")
